@@ -1,7 +1,7 @@
 const RADIO_NAME = 'Happy Radio'
 
 // Change Stream URL Here, Supports, ICECAST, ZENO, SHOUTCAST, RADIOJAR and any other stream service.
-const URL_STREAMING = 'https://hello.citrus3.com:8410';
+const URL_STREAMING = 'https://hello.citrus3.com:2020/stream/happyradio';
 
 //API URL /
 const API_URL = 'https://twj.es/free/?url='+URL_STREAMING;
