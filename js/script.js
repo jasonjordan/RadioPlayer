@@ -3,18 +3,15 @@ const RADIO_NAME = 'Happy Radio'
 // Change Stream URL Here, Supports, ICECAST, ZENO, SHOUTCAST, RADIOJAR and any other stream service.
 const URL_STREAMING = 'https://hello.citrus3.com:2020/stream/happyradio';
 
-//API URL /
+// API URL
 const API_URL = 'https://twj.es/free/?url='+URL_STREAMING;
 const FALLBACK_API_URL = 'https://twj.es/metadata/?url=' + URL_STREAMING;
 
-// Visit https://api.vagalume.com.br/docs/ to get your API key
-const API_KEY = "18fe07917957c289983464588aabddfb";
-
 let userInteracted = true;
 
-let musicaAtual = null;
+let currentSongName = null;
 
-// Cache para a API do iTunes
+// Cache for the iTunes API
 const cache = {};
 
 window.addEventListener('load', () => { 
@@ -25,19 +22,19 @@ window.addEventListener('load', () => {
     const player = new Player();
     player.play();
 
-    // Chama a função getStreamingData imediatamente quando a página carrega
+    // Fetch streaming data immediately when the page loads
     getStreamingData();
 
-    // Define o intervalo para atualizar os dados de streaming a cada 10 segundos
+    // Set interval to update streaming data every 10 seconds
     const streamingInterval = setInterval(getStreamingData, 10000);
 
-    // Ajusta a altura da capa do álbum para ser igual à sua largura
-    const coverArt = document.querySelector('.cover-album'); // Use querySelector para selecionar o elemento
+    // Adjust the album cover height to equal its width
+    const coverArt = document.querySelector('.cover-album');
     if (coverArt) { 
-      // Adiciona uma verificação para garantir que o elemento exista
+      // Ensure the element exists before setting height
       coverArt.style.height = `${coverArt.offsetWidth}px`;
     } else {
-      console.warn("Elemento .cover-album não encontrado.");
+      console.warn("Cover album element not found.");
     }
 });
 
@@ -54,17 +51,17 @@ class Page {
             const lyricsSong = document.getElementById('lyricsSong');
         
             if (song !== currentSong.textContent || artist !== currentArtist.textContent) { 
-                // Esmaecer o conteúdo existente (fade-out)
+                // Fade out existing content
                 currentSong.classList.add('fade-out');
                 currentArtist.classList.add('fade-out');
         
                 setTimeout(function() {
-                    // Atualizar o conteúdo após o fade-out
+                    // Update content after fade-out
                     currentSong.textContent = song; 
                     currentArtist.textContent = artist;
                     lyricsSong.textContent = song + ' - ' + artist;
         
-                    // Esmaecer o novo conteúdo (fade-in)
+                    // Fade in new content
                     currentSong.classList.remove('fade-out');
                     currentSong.classList.add('fade-in');
                     currentArtist.classList.remove('fade-out');
@@ -72,48 +69,45 @@ class Page {
                 }, 500); 
         
                 setTimeout(function() {
-                    // Remover as classes fade-in após a animação
+                    // Remove fade-in classes after animation
                     currentSong.classList.remove('fade-in');
                     currentArtist.classList.remove('fade-in');
                 }, 1000); 
             }
         };
           
-        this.refreshHistoric = async function (info, n) {
-            const historicDiv = document.querySelectorAll("#historicSong article")[n];
+        this.refreshHistoryItem = async function (info, n) {
+            const historyDiv = document.querySelectorAll("#historicSong article")[n];
             const songName = document.querySelectorAll("#historicSong article .music-info .song")[n];
             const artistName = document.querySelectorAll("#historicSong article .music-info .artist")[n];
             const coverHistoric = document.querySelectorAll("#historicSong article .cover-historic")[n];
 
             const defaultCoverArt = "img/cover.png";
 
-            // Extrai o título da música e o nome do artista,
-            // tratando a possibilidade de 'song' e 'artist' serem objetos ou strings.
+            // Extract song title and artist name, handling the possibility that they may be objects or strings
             const songTitle = typeof info.song === "object" ? info.song.title : info.song;
             const songArtist = typeof info.artist === "object" ? info.artist.title : info.artist;
 
-            // Define o conteúdo dos elementos HTML,
-            // incluindo uma verificação para evitar erros caso os valores estejam ausentes.
-            songName.innerHTML = songTitle || "Desconhecido";
-            artistName.innerHTML = songArtist || "Desconhecido";
+            // Set HTML element content with fallback for missing values
+            songName.innerHTML = songTitle || "Unknown";
+            artistName.innerHTML = songArtist || "Unknown";
 
             try {
-                // Utiliza os valores extraídos para buscar a capa do álbum na API do iTunes.
+                // Use extracted values to fetch album cover from iTunes API
                 const data = await getDataFromITunes(songArtist, songTitle, defaultCoverArt, defaultCoverArt);
-                // Define a imagem de fundo do elemento 'coverHistoric' com a capa encontrada.
+                // Set background image for history cover
                 coverHistoric.style.backgroundImage = "url(" + (data.art || defaultCoverArt) + ")";
             } catch (error) {
-                // Captura e imprime o erro no console para ajudar na depuração.
-                console.log("Erro ao buscar dados da API do iTunes:");
+                // Log error and set default cover on failure
+                console.log("Error fetching iTunes API data:");
                 console.error(error);
-                // Define a imagem de fundo como a capa padrão em caso de erro.
                 coverHistoric.style.backgroundImage = "url(" + defaultCoverArt + ")";
             }
 
-            // Adiciona a classe 'animated' para a animação de slide.
-            historicDiv.classList.add("animated", "slideInRight");
-            // Remove a classe 'animated' após 2 segundos para preparar para a próxima animação.
-            setTimeout(() => historicDiv.classList.remove("animated", "slideInRight"), 2000);
+            // Add animated class for slide animation
+            historyDiv.classList.add("animated", "slideInRight");
+            // Remove animated class after 2 seconds to prepare for next animation
+            setTimeout(() => historyDiv.classList.remove("animated", "slideInRight"), 2000);
         };
                 
         this.refreshCover = async function (song = '', artist) {
@@ -124,15 +118,15 @@ class Page {
             try {
                 const data = await getDataFromITunes(artist, song, defaultCoverArt, defaultCoverArt);
         
-                // Aplica a imagem de capa (sempre, mesmo se for a padrão)
+                // Apply cover image (always, even if default)
                 coverArt.style.backgroundImage = 'url(' + data.art + ')';
                 coverBackground.style.backgroundImage = 'url(' + data.cover + ')';
         
-                // Adiciona/remove classes para animação (se necessário)
+                // Add/remove classes for animation if necessary
                 coverArt.classList.add('animated', 'bounceInLeft');
                 setTimeout(() => coverArt.classList.remove('animated', 'bounceInLeft'), 2000);
               
-                // Atualiza MediaSession (se suportado)
+                // Update MediaSession if supported
                 if ('mediaSession' in navigator) {
                     const artwork = [
                         { src: data.art, sizes: '96x96',   type: 'image/png' },
@@ -150,13 +144,12 @@ class Page {
                     });
                 }
             } catch (error) {
-                console.log("Erro ao buscar dados da API do iTunes:", error);
-                // ... (lógica para lidar com o erro)
+                console.log("Error fetching iTunes API data:", error);
             }
         };
 
         this.changeVolumeIndicator = function(volume) {
-            document.getElementById('volIndicator').textContent = volume; // Use textContent em vez de innerHTML
+            document.getElementById('volIndicator').textContent = volume;
           
             if (typeof Storage !== 'undefined') {
               localStorage.setItem('volume', volume);
@@ -165,15 +158,15 @@ class Page {
           
         this.setVolume = function() {
             if (typeof Storage !== 'undefined') {
-              const volumeLocalStorage = localStorage.getItem('volume') || 80; // Operador de coalescência nula (??)
+              const volumeFromStorage = localStorage.getItem('volume') || 80;
           
-              document.getElementById('volume').value = volumeLocalStorage;
-              document.getElementById('volIndicator').textContent = volumeLocalStorage;
+              document.getElementById('volume').value = volumeFromStorage;
+              document.getElementById('volIndicator').textContent = volumeFromStorage;
             }
           };
 
-        this.refreshLyric = async function (currentSong, currentArtist) {
-            const openLyric = document.getElementsByClassName('lyrics')[0];
+        this.refreshLyrics = async function (currentSong, currentArtist) {
+            const lyricsButton = document.getElementsByClassName('lyrics')[0];
             
             try {
                 // Using Open-Lyrics API (no authentication required)
@@ -182,19 +175,19 @@ class Page {
                 
                 if (data.lyrics) {
                     document.getElementById('lyric').innerHTML = data.lyrics.replace(/\n/g, '<br />');
-                    openLyric.style.opacity = "1";
-                    openLyric.classList.remove('disabled');
-                    openLyric.style.pointerEvents = 'auto';
+                    lyricsButton.style.opacity = "1";
+                    lyricsButton.classList.remove('disabled');
+                    lyricsButton.style.pointerEvents = 'auto';
                 } else {
-                    openLyric.style.opacity = "0.3";
-                    openLyric.classList.add('disabled');
-                    openLyric.style.pointerEvents = 'none';
+                    lyricsButton.style.opacity = "0.3";
+                    lyricsButton.classList.add('disabled');
+                    lyricsButton.style.pointerEvents = 'none';
                 }
             } catch (error) {
-                console.log("Erro ao buscar a letra da música com Open-Lyrics API:", error);
-                openLyric.style.opacity = "0.3";
-                openLyric.classList.add('disabled');
-                openLyric.style.pointerEvents = 'none';
+                console.log("Error fetching lyrics from Open-Lyrics API:", error);
+                lyricsButton.style.opacity = "0.3";
+                lyricsButton.classList.add('disabled');
+                lyricsButton.style.pointerEvents = 'none';
             }
         };
     }
@@ -216,21 +209,21 @@ async function getStreamingData() {
             const safeCurrentSong = (currentSong || "").replace(/'/g, "'").replace(/&/g, "&");
             const safeCurrentArtist = (currentArtist || "").replace(/'/g, "'").replace(/&/g, "&");
 
-            if (safeCurrentSong !== musicaAtual) {
+            if (safeCurrentSong !== currentSongName) {
                 document.title = `${safeCurrentSong} - ${safeCurrentArtist} | ${RADIO_NAME}`;
 
                 page.refreshCover(safeCurrentSong, safeCurrentArtist);
                 page.refreshCurrentSong(safeCurrentSong, safeCurrentArtist);
-                page.refreshLyric(safeCurrentSong, safeCurrentArtist);
+                page.refreshLyrics(safeCurrentSong, safeCurrentArtist);
 
-                const historicContainer = document.getElementById("historicSong");
-                historicContainer.innerHTML = "";
+                const historyContainer = document.getElementById("historicSong");
+                historyContainer.innerHTML = "";
 
                 const historyArray = data.song_history
                     ? data.song_history.map((item) => ({ song: item.song.title, artist: item.song.artist }))
                     : data.history;
 
-                const maxSongsToDisplay = 4; // Adjust as needed
+                const maxSongsToDisplay = 4;
                 const limitedHistory = historyArray.slice(Math.max(0, historyArray.length - maxSongsToDisplay));
 
                 for (let i = 0; i < limitedHistory.length; i++) {
@@ -240,43 +233,43 @@ async function getStreamingData() {
                     article.innerHTML = `
                         <div class="cover-historic" style="background-image: url('img/cover.png');"></div>
                         <div class="music-info">
-                          <p class="song">${songInfo.song || "Desconhecido"}</p>
-                          <p class="artist">${songInfo.artist || "Desconhecido"}</p>
+                          <p class="song">${songInfo.song || "Unknown"}</p>
+                          <p class="artist">${songInfo.artist || "Unknown"}</p>
                         </div>
                       `;
-                    historicContainer.appendChild(article);
+                    historyContainer.appendChild(article);
                     try {
-                        page.refreshHistoric(songInfo, i);
+                        page.refreshHistoryItem(songInfo, i);
                     } catch (error) {
-                        console.error("Error refreshing historic song:", error);
+                        console.error("Error refreshing history item:", error);
                     }
                 }
-                musicaAtual = safeCurrentSong;
+                currentSongName = safeCurrentSong;
             }
         }
     } catch (error) {
-        console.log("Erro ao buscar dados de streaming:", error);
+        console.log("Error fetching streaming data:", error);
     }
 }
 
 
-// Função para buscar dados de streaming de uma API específica
+// Function to fetch streaming data from a specific API
 async function fetchStreamingData(apiUrl) {
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
-      throw new Error(`Erro na requisição da API: ${response.status} ${response.statusText}`);
+      throw new Error(`API request error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.log("Erro ao buscar dados de streaming da API:", error);
-    return null; // Retorna null em caso de erro
+    console.log("Error fetching streaming data from API:", error);
+    return null;
   }
 }
 
-// Função para alterar o tamanho da imagem do iTunes
+// Function to change iTunes image size
 function changeImageSize(url, size) {
   const parts = url.split("/");
   const filename = parts.pop();
@@ -284,20 +277,20 @@ function changeImageSize(url, size) {
   return parts.join("/") + "/" + newFilename;
 }
 
-// Função para buscar dados da API do iTunes
+// Function to fetch data from iTunes API
 const getDataFromITunes = async (artist, title, defaultArt, defaultCover) => {
-  let text;
+  let searchTerm;
   if (artist === title) {
-      text = `${title}`;
+      searchTerm = `${title}`;
   } else {
-      text = `${artist} - ${title}`;
+      searchTerm = `${artist} - ${title}`;
   }
-  const cacheKey = text.toLowerCase();
+  const cacheKey = searchTerm.toLowerCase();
   if (cache[cacheKey]) {
       return cache[cacheKey];
   }
 
-  const response = await fetch(`https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(text)}`);
+  const response = await fetch(`https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchTerm)}`);
   if (response.status === 403) {
       const results = {
           title,
@@ -321,8 +314,8 @@ const getDataFromITunes = async (artist, title, defaultArt, defaultCover) => {
   }
   const itunes = data.results[0];
   const results = {
-      title: title, // Mantive o título original da transmissão
-      artist: artist, // Mantive o artista original da transmissão
+      title: title,
+      artist: artist,
       thumbnail: itunes.artworkUrl100 || defaultArt,
       art: itunes.artworkUrl100 ? changeImageSize(itunes.artworkUrl100, "600x600") : defaultArt,
       cover: itunes.artworkUrl100 ? changeImageSize(itunes.artworkUrl100, "1500x1500") : defaultCover,
@@ -332,10 +325,10 @@ const getDataFromITunes = async (artist, title, defaultArt, defaultCover) => {
   return results;
 };
 
-// AUDIO 
+// AUDIO
 
 
-// Variável global para armazenar as músicas
+// Global variable for audio stream
 var audio = new Audio(URL_STREAMING);
 
 // Player control
@@ -357,7 +350,7 @@ class Player {
             }
             document.getElementById('volIndicator').innerHTML = defaultVolume;
             
-            togglePlay(); // Adiciona esta linha para atualizar o botão
+            togglePlay();
         };
 
         this.pause = function () {
@@ -368,21 +361,17 @@ class Player {
 
 // On play, change the button to pause
 audio.onplay = function () {
-    var botao = document.getElementById('playerButton');
-    var bplay = document.getElementById('buttonPlay');
-    if (botao.className === 'fa fa-play') {
-        botao.className = 'fa fa-pause';
-        bplay.firstChild.data = 'PAUSAR';
+    var button = document.getElementById('playerButton');
+    if (button.className === 'fa fa-play') {
+        button.className = 'fa fa-pause';
     }
 }
 
 // On pause, change the button to play
 audio.onpause = function () {
-    var botao = document.getElementById('playerButton');
-    var bplay = document.getElementById('buttonPlay');
-    if (botao.className === 'fa fa-pause') {
-        botao.className = 'fa fa-play';
-        bplay.firstChild.data = 'PLAY';
+    var button = document.getElementById('playerButton');
+    if (button.className === 'fa fa-pause') {
+        button.className = 'fa fa-play';
     }
 }
 
@@ -394,9 +383,9 @@ audio.onvolumechange = function () {
 }
 
 audio.onerror = function () {
-    var confirmacao = confirm('Stream Down / Network Error. \nClick OK to try again.');
+    var confirmed = confirm('Stream Down / Network Error. \nClick OK to try again.');
 
-    if (confirmacao) {
+    if (confirmed) {
         window.location.reload();
     }
 }
@@ -425,7 +414,7 @@ function togglePlay() {
       audio.load();
       audio.play();
     }
-  }
+}
 
 function volumeUp() {
     var vol = audio.volume;
