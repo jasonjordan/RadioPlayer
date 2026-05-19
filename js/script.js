@@ -174,7 +174,6 @@ class Page {
 
         this.refreshLyric = async function (currentSong, currentArtist) {
             const openLyric = document.getElementsByClassName('lyrics')[0];
-            const modalLyric = document.getElementById('modalLyrics');
             
             try {
                 // Using Open-Lyrics API (no authentication required)
@@ -184,22 +183,18 @@ class Page {
                 if (data.lyrics) {
                     document.getElementById('lyric').innerHTML = data.lyrics.replace(/\n/g, '<br />');
                     openLyric.style.opacity = "1";
-                    openLyric.setAttribute('data-toggle', 'modal');
-                    
-                    // Esconde o modal caso esteja visível
-                    modalLyric.style.display = "none";
-                    modalLyric.setAttribute('aria-hidden', 'true');
-                    if (document.getElementsByClassName('modal-backdrop')[0]) {
-                        document.getElementsByClassName('modal-backdrop')[0].remove();
-                    }
+                    openLyric.classList.remove('disabled');
+                    openLyric.style.pointerEvents = 'auto';
                 } else {
                     openLyric.style.opacity = "0.3";
-                    openLyric.removeAttribute('data-toggle');
+                    openLyric.classList.add('disabled');
+                    openLyric.style.pointerEvents = 'none';
                 }
             } catch (error) {
                 console.log("Erro ao buscar a letra da música com Open-Lyrics API:", error);
                 openLyric.style.opacity = "0.3";
-                openLyric.removeAttribute('data-toggle');
+                openLyric.classList.add('disabled');
+                openLyric.style.pointerEvents = 'none';
             }
         };
     }
