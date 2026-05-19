@@ -1,6 +1,6 @@
 {
-  "name": "Jailson Webradio",
-  "short_name": "Jailson Webradio",
+  "name": "Happy Radio",
+  "short_name": "happyradio",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
