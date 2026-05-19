@@ -177,31 +177,29 @@ class Page {
             const modalLyric = document.getElementById('modalLyrics');
             
             try {
-              const response = await fetch('https://api.vagalume.com.br/search.php?apikey=' + API_KEY + '&art=' + currentArtist + '&mus=' + currentSong.toLowerCase());
-              const data = await response.json();
-          
-              if (data.type === 'exact' || data.type === 'aprox') {
-                const lyric = data.mus[0].text;
-          
-                //document.getElementById('lyric').textContent = lyric.replace(/\n/g, '<br />'); Use textContent em vez de innerHTML
-                document.getElementById('lyric').innerHTML = lyric.replace(/\n/g, '<br />');
-                openLyric.style.opacity = "1";
-                openLyric.setAttribute('data-toggle', 'modal');
-          
-                // Esconde o modal caso esteja visível
-                modalLyric.style.display = "none";
-                modalLyric.setAttribute('aria-hidden', 'true');
-                if (document.getElementsByClassName('modal-backdrop')[0]) {
-                  document.getElementsByClassName('modal-backdrop')[0].remove();
+                // Using Open-Lyrics API (no authentication required)
+                const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(currentArtist)}/${encodeURIComponent(currentSong)}`);
+                const data = await response.json();
+                
+                if (data.lyrics) {
+                    document.getElementById('lyric').innerHTML = data.lyrics.replace(/\n/g, '<br />');
+                    openLyric.style.opacity = "1";
+                    openLyric.setAttribute('data-toggle', 'modal');
+                    
+                    // Esconde o modal caso esteja visível
+                    modalLyric.style.display = "none";
+                    modalLyric.setAttribute('aria-hidden', 'true');
+                    if (document.getElementsByClassName('modal-backdrop')[0]) {
+                        document.getElementsByClassName('modal-backdrop')[0].remove();
+                    }
+                } else {
+                    openLyric.style.opacity = "0.3";
+                    openLyric.removeAttribute('data-toggle');
                 }
-              } else {
+            } catch (error) {
+                console.log("Erro ao buscar a letra da música com Open-Lyrics API:", error);
                 openLyric.style.opacity = "0.3";
                 openLyric.removeAttribute('data-toggle');
-              }
-            } catch (error) {
-              console.log("Erro ao buscar a letra da música:", error);
-              openLyric.style.opacity = "0.3";
-              openLyric.removeAttribute('data-toggle');
             }
         };
     }
@@ -525,4 +523,4 @@ function intToDecimal(vol) {
 
 function decimalToInt(vol) {
     return vol * 100;
-} 
+}
