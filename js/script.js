@@ -1,11 +1,8 @@
 const RADIO_NAME = 'Happy Radio';
 
-// Set your stream URL here (ICECAST, ZENO, SHOUTCAST, etc.)
+// Stream URL and metadata endpoint
 const STREAM_URL = 'https://hello.citrus3.com:2020/stream/happyradio';
-
-// API URLs for streaming data
-const STREAM_API_URL = 'https://twj.es/free/?url=' + STREAM_URL;
-const FALLBACK_STREAM_API_URL = 'https://twj.es/metadata/?url=' + STREAM_URL;
+const METADATA_API_URL = 'https://hello.citrus3.com:2020/json/stream/happyradio';
 
 let currentSongName = null;
 const coverCache = {};
@@ -16,15 +13,11 @@ window.addEventListener('load', () => {
     page.updatePageTitle();
     page.setVolume();
 
-    // Remove auto-player.play/togglePlay: only user action starts audio!
-
-    // Fetch streaming data instantly
+    // Fetch streaming data immediately and then poll
     getStreamingData();
-
-    // Poll streaming data every 10s
     setInterval(getStreamingData, 10000);
 
-    // Set album cover height
+    // Set album cover height to its width (if present)
     const coverArt = document.querySelector('.cover-album');
     if (coverArt) {
         coverArt.style.height = `${coverArt.offsetWidth}px`;
@@ -32,7 +25,7 @@ window.addEventListener('load', () => {
         console.warn("Element .cover-album not found.");
     }
 
-    // Setup play button: user gesture only!
+    // Setup play button (user gesture required for audio playback)
     const playButton = document.getElementById('playerButton');
     if (playButton) {
         playButton.addEventListener('click', function() {
@@ -78,8 +71,10 @@ class Page {
         const artistFields = document.querySelectorAll("#historicSong article .music-info .artist");
         const coverFields = document.querySelectorAll("#historicSong article .cover-historic");
         const defaultCover = "img/cover.png";
+
         const songTitle = typeof info.song === "object" ? info.song.title : info.song;
         const songArtist = typeof info.artist === "object" ? info.artist.title : info.artist;
+
         if (songFields[n]) songFields[n].textContent = songTitle || "Unknown";
         if (artistFields[n]) artistFields[n].textContent = songArtist || "Unknown";
 
@@ -89,6 +84,7 @@ class Page {
         } catch (error) {
             if (coverFields[n]) coverFields[n].style.backgroundImage = "url(" + defaultCover + ")";
         }
+
         if (historyArticles[n]) {
             historyArticles[n].classList.add("animated", "slideInRight");
             setTimeout(() => historyArticles[n].classList.remove("animated", "slideInRight"), 2000);
@@ -110,4 +106,24 @@ class Page {
             if ('mediaSession' in navigator) {
                 const artwork = [
                     { src: data.art, sizes: '96x96', type: 'image/png' },
-                    { src: data.art, sizes: '128x128', type](#)
+                    { src: data.art, sizes: '128x128', type: 'image/png' },
+                    { src: data.art, sizes: '192x192', type: 'image/png' },
+                    { src: data.art, sizes: '256x256', type: 'image/png' },
+                    { src: data.art, sizes: '384x384', type: 'image/png' },
+                    { src: data.art, sizes: '512x512', type: 'image/png' }
+                ];
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: song,
+                    artist: artist,
+                    artwork
+                });
+            }
+        } catch (error) {
+            // Silent on cover errors
+        }
+    }
+
+    updateVolumeIndicator(volume) {
+        const volIndicator = document.getElementById('volIndicator');
+        if (](#)
+
