@@ -1,529 +1,673 @@
-const RADIO_NAME = 'Happy Radio';
+'use strict';
 
-// Stream URL and metadata endpoint
-const STREAM_URL = 'https://hello.citrus3.com:2020/stream/happyradio';
-const METADATA_API_URL = 'https://hello.citrus3.com:2020/json/stream/happyradio';
-
-let currentSongName = null;
-const coverCache = {};
-
-// Wait for DOM load
-window.addEventListener('load', () => {
-    const page = new Page();
-    page.updatePageTitle();
-    page.setVolume();
-
-    // Fetch streaming data immediately and then poll
-    getStreamingData();
-    setInterval(getStreamingData, 10000);
-
-    // Set album cover height to its width (if present)
-    const coverArt = document.querySelector('.cover-album');
-    if (coverArt) {
-        coverArt.style.height = `${coverArt.offsetWidth}px`;
-    } else {
-        console.warn("Element .cover-album not found.");
-    }
-
-    // Setup play button (user gesture required for audio playback)
-    const playButton = document.getElementById('playerButton');
-    if (playButton) {
-        playButton.addEventListener('click', function() {
-            togglePlay();
-        });
-    }
+/* ========================================================================
+   Radio Player — Config
+   ======================================================================== */
+const CONFIG = Object.freeze({
+    RADIO_NAME: 'Happy Radio',
+    STREAM_URL: 'https://hello.citrus3.com:2020/stream/happyradio',
+    METADATA_API_URL: 'https://hello.citrus3.com:2020/json/stream/happyradio',
+    POLLING_INTERVAL: 10000,   // ms
+    FETCH_TIMEOUT: 8000,       // ms
+    HISTORY_LIMIT: 4,
+    DEFAULT_VOLUME: 80,
+    DEFAULT_COVER: 'img/cover.png'
 });
 
-// Page and UI control
-class Page {
-    updatePageTitle(title = RADIO_NAME) {
-        document.title = title;
+/* ========================================================================
+   Radio Player — Main Application
+   ======================================================================== */
+class RadioApp {
+    constructor() {
+        // Audio element
+        this.audio = new Audio(CONFIG.STREAM_URL);
+        this.audio.preload = 'none';
+        this.audio.crossOrigin = 'anonymous';
+
+        // State
+        this.currentSongName = null;
+        this.coverCache = new Map();
+        this.pollingTimer = null;
+        this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
+        this.hasLoaded = false;
+
+        // Cached DOM refs
+        this.dom = {};
+
+        // Initialize
+        this._cacheDOM();
+        this._bindEvents();
+        this._setInitialVolume();
+        this._startPolling();
+        this._setupMediaSession();
+
+        // Set square cover art
+        this._resizeCover();
+
+        // Initial data fetch
+        this._fetchStreamingData();
     }
 
-    refreshCurrentSong(song, artist) {
-        const songElem = document.getElementById('currentSong');
-        const artistElem = document.getElementById('currentArtist');
-        const lyricsTitleElem = document.getElementById('lyricsSong');
-        if (!songElem || !artistElem || !lyricsTitleElem) return;
-
-        if (song !== songElem.textContent || artist !== artistElem.textContent) {
-            songElem.classList.add('fade-out');
-            artistElem.classList.add('fade-out');
-            setTimeout(() => {
-                songElem.textContent = song;
-                artistElem.textContent = artist;
-                lyricsTitleElem.textContent = song + ' - ' + artist;
-                songElem.classList.remove('fade-out');
-                songElem.classList.add('fade-in');
-                artistElem.classList.remove('fade-out');
-                artistElem.classList.add('fade-in');
-            }, 500);
-            setTimeout(() => {
-                songElem.classList.remove('fade-in');
-                artistElem.classList.remove('fade-in');
-            }, 1000);
-        }
+    /* --------------------------------------------------------------------
+       DOM caching
+       -------------------------------------------------------------------- */
+    _cacheDOM() {
+        this.dom = {
+            playerButton: document.getElementById('playerButton'),
+            volumeSlider: document.getElementById('volume'),
+            volIndicator: document.getElementById('volIndicator'),
+            currentSong: document.getElementById('currentSong'),
+            currentArtist: document.getElementById('currentArtist'),
+            currentCoverArt: document.getElementById('currentCoverArt'),
+            bgCover: document.getElementById('bgCover'),
+            lyricsSong: document.getElementById('lyricsSong'),
+            lyric: document.getElementById('lyric'),
+            lyricsButton: document.querySelector('.lyrics'),
+            historicSong: document.getElementById('historicSong'),
+            coverAlbum: document.querySelector('.cover-album')
+        };
     }
 
-    async refreshHistoryItem(info, n) {
-        const historyArticles = document.querySelectorAll("#historicSong article");
-        const songFields = document.querySelectorAll("#historicSong article .music-info .song");
-        const artistFields = document.querySelectorAll("#historicSong article .music-info .artist");
-        const coverFields = document.querySelectorAll("#historicSong article .cover-historic");
-        const defaultCover = "img/cover.png";
-
-        const songTitle = typeof info.song === "object" ? info.song.title : info.song;
-        const songArtist = typeof info.artist === "object" ? info.artist.title : info.artist;
-
-        if (songFields[n]) songFields[n].textContent = songTitle || "Unknown";
-        if (artistFields[n]) artistFields[n].textContent = songArtist || "Unknown";
-
-        try {
-            const data = await getCoverDataFromITunes(songArtist, songTitle, defaultCover, defaultCover);
-            if (coverFields[n]) coverFields[n].style.backgroundImage = "url(" + (data.art || defaultCover) + ")";
-        } catch (error) {
-            if (coverFields[n]) coverFields[n].style.backgroundImage = "url(" + defaultCover + ")";
+    /* --------------------------------------------------------------------
+       Event binding
+       -------------------------------------------------------------------- */
+    _bindEvents() {
+        // Play / pause button
+        if (this.dom.playerButton) {
+            this.dom.playerButton.addEventListener('click', () => this.togglePlay());
+            this.dom.playerButton.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.togglePlay();
+                }
+            });
         }
 
-        if (historyArticles[n]) {
-            historyArticles[n].classList.add("animated", "slideInRight");
-            setTimeout(() => historyArticles[n].classList.remove("animated", "slideInRight"), 2000);
-        }
-    }
-
-    async refreshCover(song = '', artist) {
-        const coverArt = document.getElementById('currentCoverArt');
-        const coverBackground = document.getElementById('bgCover');
-        const defaultCover = 'img/cover.png';
-        if (!coverArt || !coverBackground) return;
-        try {
-            const data = await getCoverDataFromITunes(artist, song, defaultCover, defaultCover);
-            coverArt.style.backgroundImage = 'url(' + data.art + ')';
-            coverBackground.style.backgroundImage = 'url(' + data.cover + ')';
-            coverArt.classList.add('animated', 'bounceInLeft');
-            setTimeout(() => coverArt.classList.remove('animated', 'bounceInLeft'), 2000);
-
-            if ('mediaSession' in navigator) {
-                const artwork = [
-                    { src: data.art, sizes: '96x96', type: 'image/png' },
-                    { src: data.art, sizes: '128x128', type: 'image/png' },
-                    { src: data.art, sizes: '192x192', type: 'image/png' },
-                    { src: data.art, sizes: '256x256', type: 'image/png' },
-                    { src: data.art, sizes: '384x384', type: 'image/png' },
-                    { src: data.art, sizes: '512x512', type: 'image/png' }
-                ];
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: song,
-                    artist: artist,
-                    artwork
-                });
+        // Audio lifecycle
+        this.audio.addEventListener('play', () => this._onAudioPlay());
+        this.audio.addEventListener('pause', () => this._onAudioPause());
+        this.audio.addEventListener('volumechange', () => {
+            if (this.audio.volume > 0 && this.audio.muted) {
+                this.audio.muted = false;
             }
-        } catch (error) {
-            // Silent on cover errors
+        });
+        this.audio.addEventListener('error', (e) => this._onAudioError(e));
+        this.audio.addEventListener('stalled', () => {
+            console.warn('Audio stream stalled');
+        });
+
+        // Volume slider
+        if (this.dom.volumeSlider) {
+            this.dom.volumeSlider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value, 10);
+                this.audio.volume = val / 100;
+                this._updateVolumeIndicator(val);
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this._handleKeydown(e));
+
+        // Page Visibility API — conserve bandwidth when tab is hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this._stopPolling();
+            } else {
+                this._fetchStreamingData();
+                this._startPolling();
+            }
+        });
+
+        // Responsive cover art
+        window.addEventListener('resize', () => this._resizeCover());
+    }
+
+    /* --------------------------------------------------------------------
+       Playback controls
+       -------------------------------------------------------------------- */
+    togglePlay() {
+        if (this.audio.paused) {
+            this._play();
+        } else {
+            this._pause();
         }
     }
 
-    updateVolumeIndicator(volume) {
-        const volIndicator = document.getElementById('volIndicator');
-        if (volIndicator) volIndicator.textContent = volume;
-        if (typeof Storage !== 'undefined') {
-            localStorage.setItem('volume', volume);
+    _play() {
+        // Load only on first play or after an error
+        if (!this.hasLoaded || this.audio.error) {
+            this.audio.load();
+            this.hasLoaded = true;
+        }
+
+        this.audio.play().catch((err) => {
+            console.warn('Audio play failed (user gesture may be required):', err);
+        });
+    }
+
+    _pause() {
+        this.audio.pause();
+    }
+
+    _onAudioPlay() {
+        if (this.dom.playerButton) {
+            this.dom.playerButton.classList.remove('fa-play-circle');
+            this.dom.playerButton.classList.add('fa-pause-circle');
+            this.dom.playerButton.setAttribute('aria-label', 'Pause');
+        }
+        this._updateMediaSessionPlaybackState('playing');
+    }
+
+    _onAudioPause() {
+        if (this.dom.playerButton) {
+            this.dom.playerButton.classList.remove('fa-pause-circle');
+            this.dom.playerButton.classList.add('fa-play-circle');
+            this.dom.playerButton.setAttribute('aria-label', 'Play');
+        }
+        this._updateMediaSessionPlaybackState('paused');
+    }
+
+    _onAudioError(err) {
+        console.error('Audio stream error:', err);
+        const confirmed = confirm('Stream unavailable or network error.\nClick OK to try again.');
+        if (confirmed) window.location.reload();
+    }
+
+    /* --------------------------------------------------------------------
+       Volume controls
+       -------------------------------------------------------------------- */
+    _setInitialVolume() {
+        let vol = CONFIG.DEFAULT_VOLUME;
+        try {
+            const stored = localStorage.getItem('volume');
+            if (stored !== null) vol = parseInt(stored, 10);
+        } catch (e) {
+            // localStorage may be unavailable in private mode
+        }
+
+        vol = this._clamp(vol, 0, 100);
+        this.audio.volume = vol / 100;
+
+        if (this.dom.volumeSlider) this.dom.volumeSlider.value = vol;
+        if (this.dom.volIndicator) this.dom.volIndicator.textContent = vol;
+    }
+
+    _updateVolumeIndicator(volume) {
+        const v = this._clamp(parseInt(volume, 10), 0, 100);
+        if (this.dom.volIndicator) this.dom.volIndicator.textContent = v;
+        try {
+            localStorage.setItem('volume', v);
+        } catch (e) {
+            // ignore
         }
     }
 
-    setVolume() {
-        if (typeof Storage !== 'undefined') {
-            const volumeFromStorage = localStorage.getItem('volume') || 80;
-            const volumeElem = document.getElementById('volume');
-            const volIndicator = document.getElementById('volIndicator');
-            if (volumeElem) volumeElem.value = volumeFromStorage;
-            if (volIndicator) volIndicator.textContent = volumeFromStorage;
+    volumeUp() {
+        const next = Math.min(100, Math.round((this.audio.volume + 0.01) * 100));
+        this.audio.volume = next / 100;
+        if (this.dom.volumeSlider) this.dom.volumeSlider.value = next;
+        this._updateVolumeIndicator(next);
+    }
+
+    volumeDown() {
+        const next = Math.max(0, Math.round((this.audio.volume - 0.01) * 100));
+        this.audio.volume = next / 100;
+        if (this.dom.volumeSlider) this.dom.volumeSlider.value = next;
+        this._updateVolumeIndicator(next);
+    }
+
+    toggleMute() {
+        if (!this.audio.muted) {
+            this.volumeBeforeMute = Math.round(this.audio.volume * 100) || CONFIG.DEFAULT_VOLUME;
+            this.audio.muted = true;
+            this.audio.volume = 0;
+            if (this.dom.volumeSlider) this.dom.volumeSlider.value = 0;
+            if (this.dom.volIndicator) this.dom.volIndicator.textContent = 0;
+        } else {
+            const vol = this.volumeBeforeMute;
+            this.audio.muted = false;
+            this.audio.volume = vol / 100;
+            if (this.dom.volumeSlider) this.dom.volumeSlider.value = vol;
+            if (this.dom.volIndicator) this.dom.volIndicator.textContent = vol;
+            this._updateVolumeIndicator(vol);
         }
     }
 
-    async refreshLyrics(currentSong, currentArtist) {
-        const lyricsButton = document.getElementsByClassName('lyrics')[0];
-        const lyricsBox = document.getElementById('lyric');
-        if (!lyricsButton || !lyricsBox) return;
+    /* --------------------------------------------------------------------
+       Keyboard shortcuts
+       -------------------------------------------------------------------- */
+    _handleKeydown(event) {
+        const key = event.key;
 
-        // Only try when we have valid artist and title
-        if (!currentSong || !currentArtist || currentSong === "Unknown" || currentArtist === "Unknown") {
-            lyricsButton.style.opacity = "0.3";
-            lyricsButton.classList.add('disabled');
-            lyricsButton.style.pointerEvents = 'none';
-            lyricsBox.innerHTML = "";
+        // Prevent default for media keys so page doesn't scroll
+        if (key === ' ' || key === 'Spacebar' || key === 'ArrowUp' || key === 'ArrowDown') {
+            event.preventDefault();
+        }
+
+        switch (key) {
+            case 'ArrowUp':
+                this.volumeUp();
+                break;
+            case 'ArrowDown':
+                this.volumeDown();
+                break;
+            case ' ':
+            case 'Spacebar':
+                this.togglePlay();
+                break;
+            case 'p':
+            case 'P':
+                this.togglePlay();
+                break;
+            case 'm':
+            case 'M':
+                this.toggleMute();
+                break;
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9': {
+                let target = parseInt(key, 10);
+                if (target === 0) target = 10;
+                const val = target * 10;
+                this.audio.volume = val / 100;
+                if (this.dom.volumeSlider) this.dom.volumeSlider.value = val;
+                this._updateVolumeIndicator(val);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    /* --------------------------------------------------------------------
+       Polling & metadata fetching
+       -------------------------------------------------------------------- */
+    _startPolling() {
+        this._stopPolling();
+        this.pollingTimer = setInterval(() => this._fetchStreamingData(), CONFIG.POLLING_INTERVAL);
+    }
+
+    _stopPolling() {
+        if (this.pollingTimer) {
+            clearInterval(this.pollingTimer);
+            this.pollingTimer = null;
+        }
+    }
+
+    async _fetchStreamingData() {
+        try {
+            const data = await this._fetchWithTimeout(CONFIG.METADATA_API_URL, CONFIG.FETCH_TIMEOUT);
+            if (!data) return;
+
+            const parsed = this._parseNowPlaying(data);
+            const song = (parsed.song || 'Unknown').trim();
+            const artist = (parsed.artist || 'Unknown').trim();
+
+            if (song !== this.currentSongName) {
+                document.title = `${song} — ${artist} | ${CONFIG.RADIO_NAME}`;
+                this._refreshCover(song, artist);
+                this._refreshCurrentSong(song, artist);
+                this._refreshLyrics(song, artist);
+                this._refreshHistory(parsed.history);
+                this.currentSongName = song;
+
+                this._updateMediaSessionMetadata(song, artist);
+            }
+        } catch (err) {
+            // Silently ignore streaming errors to avoid UI noise
+            console.warn('Metadata fetch failed:', err);
+        }
+    }
+
+    async _fetchWithTimeout(url, ms) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), ms);
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(id);
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (err) {
+            clearTimeout(id);
+            return null;
+        }
+    }
+
+    /* --------------------------------------------------------------------
+       Metadata parsers
+       -------------------------------------------------------------------- */
+    _parseNowPlaying(data) {
+        let song = null;
+        let artist = null;
+        let history = [];
+
+        if (!data || typeof data !== 'object') {
+            return { song: 'Unknown', artist: 'Unknown', history: [] };
+        }
+
+        // 1) Direct fields: songtitle + artist
+        if (data.songtitle) {
+            song = data.songtitle;
+            if (typeof data.artist === 'string') artist = data.artist;
+            else if (data.artist && typeof data.artist === 'object' && data.artist.title) artist = data.artist.title;
+            else if (typeof data.song === 'object' && data.song.artist) artist = data.song.artist;
+        }
+
+        // 2) String "Artist - Title"
+        if ((!song || !artist) && typeof data.song === 'string') {
+            const parts = data.song.split(' - ').map((s) => s.trim());
+            if (parts.length === 2) {
+                artist = parts[0];
+                song = parts[1];
+            } else {
+                song = data.song;
+            }
+        }
+
+        // 3) Object { title, artist }
+        if ((!song || !artist) && typeof data.song === 'object' && data.song !== null) {
+            if (!song && data.song.title) song = data.song.title;
+            if (!artist && (data.song.artist || data.song.artists)) artist = data.song.artist || data.song.artists;
+        }
+
+        // 4) now_playing / current_track wrappers
+        if ((!song || !artist) && data.now_playing) {
+            if (!song && data.now_playing.title) song = data.now_playing.title;
+            if (!artist && data.now_playing.artist) artist = data.now_playing.artist;
+        }
+        if ((!song || !artist) && data.current_track) {
+            if (!song && data.current_track.title) song = data.current_track.title;
+            if (!artist && data.current_track.artist) artist = data.current_track.artist;
+        }
+
+        // History parsing
+        history = this._parseHistoryArray(data.song_history || data.history || data.playlist);
+
+        return {
+            song: song || 'Unknown',
+            artist: artist || 'Unknown',
+            history
+        };
+    }
+
+    _parseHistoryArray(source) {
+        if (!Array.isArray(source)) return [];
+
+        return source.map((item) => {
+            if (typeof item === 'string') {
+                const parts = item.split(' - ').map((s) => s.trim());
+                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
+                return { song: item, artist: 'Unknown' };
+            }
+            if (!item) return { song: 'Unknown', artist: 'Unknown' };
+
+            if (item.song) {
+                if (typeof item.song === 'object') {
+                    return {
+                        song: item.song.title || 'Unknown',
+                        artist: item.song.artist || 'Unknown'
+                    };
+                }
+                const parts = String(item.song).split(' - ').map((s) => s.trim());
+                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
+                return { song: String(item.song), artist: item.artist || 'Unknown' };
+            }
+            if (item.title) {
+                return { song: item.title, artist: item.artist || 'Unknown' };
+            }
+            return { song: 'Unknown', artist: 'Unknown' };
+        });
+    }
+
+    /* --------------------------------------------------------------------
+       UI updates
+       -------------------------------------------------------------------- */
+    _refreshCurrentSong(song, artist) {
+        const songEl = this.dom.currentSong;
+        const artistEl = this.dom.currentArtist;
+        const lyricsTitleEl = this.dom.lyricsSong;
+        if (!songEl || !artistEl || !lyricsTitleEl) return;
+
+        if (song === songEl.textContent && artist === artistEl.textContent) return;
+
+        songEl.classList.add('fade-out');
+        artistEl.classList.add('fade-out');
+
+        setTimeout(() => {
+            songEl.textContent = song;
+            artistEl.textContent = artist;
+            lyricsTitleEl.textContent = `${song} — ${artist}`;
+
+            songEl.classList.remove('fade-out');
+            songEl.classList.add('fade-in');
+            artistEl.classList.remove('fade-out');
+            artistEl.classList.add('fade-in');
+        }, 500);
+
+        setTimeout(() => {
+            songEl.classList.remove('fade-in');
+            artistEl.classList.remove('fade-in');
+        }, 1000);
+    }
+
+    async _refreshCover(song, artist) {
+        if (!this.dom.currentCoverArt || !this.dom.bgCover) return;
+
+        try {
+            const data = await this._getCoverDataFromITunes(artist, song);
+            this.dom.currentCoverArt.style.backgroundImage = `url('${data.art}')`;
+            this.dom.bgCover.style.backgroundImage = `url('${data.cover}')`;
+
+            this.dom.currentCoverArt.classList.add('animated', 'bounceInLeft');
+            setTimeout(() => {
+                this.dom.currentCoverArt.classList.remove('animated', 'bounceInLeft');
+            }, 2000);
+        } catch (err) {
+            this.dom.currentCoverArt.style.backgroundImage = `url('${CONFIG.DEFAULT_COVER}')`;
+            this.dom.bgCover.style.backgroundImage = `url('${CONFIG.DEFAULT_COVER}')`;
+        }
+    }
+
+    _refreshHistory(historyArray) {
+        if (!this.dom.historicSong) return;
+
+        const items = (Array.isArray(historyArray) ? historyArray : []).slice(-CONFIG.HISTORY_LIMIT);
+        this.dom.historicSong.innerHTML = '';
+
+        items.forEach((info, index) => {
+            const songTitle = info.song || 'Unknown';
+            const songArtist = info.artist || 'Unknown';
+
+            const article = document.createElement('article');
+            article.classList.add('col-12', 'col-md-6');
+            article.innerHTML = `
+                <div class="cover-historic" style="background-image: url('${CONFIG.DEFAULT_COVER}');"></div>
+                <div class="music-info">
+                    <p class="song">${this._escapeHtml(songTitle)}</p>
+                    <p class="artist">${this._escapeHtml(songArtist)}</p>
+                </div>
+            `;
+            this.dom.historicSong.appendChild(article);
+
+            // Staggered animation
+            requestAnimationFrame(() => {
+                article.classList.add('animated', 'slideInRight');
+                setTimeout(() => article.classList.remove('animated', 'slideInRight'), 2000);
+            });
+
+            // Fetch cover asynchronously
+            this._getCoverDataFromITunes(songArtist, songTitle)
+                .then((data) => {
+                    const coverEl = article.querySelector('.cover-historic');
+                    if (coverEl) coverEl.style.backgroundImage = `url('${data.art}')`;
+                })
+                .catch(() => {
+                    // keep default cover
+                });
+        });
+    }
+
+    async _refreshLyrics(song, artist) {
+        if (!this.dom.lyricsButton || !this.dom.lyric) return;
+
+        if (!song || !artist || song === 'Unknown' || artist === 'Unknown') {
+            this._disableLyrics();
             return;
         }
 
         try {
-            const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(currentArtist)}/${encodeURIComponent(currentSong)}`);
-            // ensure we got JSON back
-            if (!response.ok) throw new Error('Lyrics not found');
-            const contentType = response.headers.get("content-type") || "";
-            if (!contentType.includes("application/json")) throw new Error('Unexpected response');
-            const data = await response.json();
-            if (data && data.lyrics) {
-                lyricsBox.innerHTML = data.lyrics.replace(/\n/g, '<br />');
-                lyricsButton.style.opacity = "1";
-                lyricsButton.classList.remove('disabled');
-                lyricsButton.style.pointerEvents = 'auto';
+            const response = await this._fetchWithTimeout(
+                `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(song)}`,
+                5000
+            );
+            if (response && response.lyrics) {
+                this.dom.lyric.innerHTML = this._escapeHtml(response.lyrics).replace(/\n/g, '<br>');
+                this._enableLyrics();
             } else {
-                lyricsButton.style.opacity = "0.3";
-                lyricsButton.classList.add('disabled');
-                lyricsButton.style.pointerEvents = 'none';
-                lyricsBox.innerHTML = "";
+                this._disableLyrics();
             }
-        } catch (error) {
-            lyricsButton.style.opacity = "0.3";
-            lyricsButton.classList.add('disabled');
-            lyricsButton.style.pointerEvents = 'none';
-            lyricsBox.innerHTML = "";
-        }
-    }
-}
-
-// Helpers to parse metadata payloads safely
-function parseNowPlaying(data) {
-    // Return object: { song: stringTitle, artist: stringArtist, history: array }
-    let song = null;
-    let artist = null;
-    let history = [];
-
-    // Common shapes:
-    // 1) { songtitle: "Title", artist: "Artist", song_history: [...] }
-    if (data.songtitle && (data.artist || data.song)) {
-        song = data.songtitle;
-        if (data.artist && typeof data.artist === 'string') {
-            artist = data.artist;
-        } else if (data.artist && typeof data.artist === 'object' && data.artist.title) {
-            artist = data.artist.title;
-        } else if (typeof data.song === 'object' && data.song.artist) {
-            artist = data.song.artist;
+        } catch (err) {
+            this._disableLyrics();
         }
     }
 
-    // 2) { song: "Artist - Title" } or { song: "Title - Artist" } sometimes
-    if ((!song || !artist) && data.song && typeof data.song === 'string') {
-        // Try to split by " - " expecting "Artist - Title" or "Title - Artist"
-        const parts = data.song.split(' - ').map(s => s.trim());
-        if (parts.length === 2) {
-            // Attempt heuristic: if first part contains commas or multiple words, treat as artist
-            artist = parts[0];
-            song = parts[1];
-        } else {
-            song = data.song;
+    _enableLyrics() {
+        if (!this.dom.lyricsButton) return;
+        this.dom.lyricsButton.style.opacity = '1';
+        this.dom.lyricsButton.classList.remove('disabled');
+        this.dom.lyricsButton.style.pointerEvents = 'auto';
+        this.dom.lyricsButton.setAttribute('data-toggle', 'modal');
+        this.dom.lyricsButton.setAttribute('data-target', '#modalLyrics');
+    }
+
+    _disableLyrics() {
+        if (!this.dom.lyricsButton) return;
+        this.dom.lyricsButton.style.opacity = '0.3';
+        this.dom.lyricsButton.classList.add('disabled');
+        this.dom.lyricsButton.style.pointerEvents = 'none';
+        this.dom.lyricsButton.removeAttribute('data-toggle');
+        this.dom.lyricsButton.removeAttribute('data-target');
+        if (this.dom.lyric) this.dom.lyric.innerHTML = '';
+    }
+
+    _resizeCover() {
+        if (this.dom.coverAlbum) {
+            this.dom.coverAlbum.style.height = `${this.dom.coverAlbum.offsetWidth}px`;
         }
     }
 
-    // 3) { song: { title: "...", artist: "..." } }
-    if ((!song || !artist) && typeof data.song === 'object' && data.song !== null) {
-        if (!song && data.song.title) song = data.song.title;
-        if (!artist && (data.song.artist || data.song.artists)) artist = data.song.artist || data.song.artists;
-    }
+    /* --------------------------------------------------------------------
+       Cover art helpers
+       -------------------------------------------------------------------- */
+    async _getCoverDataFromITunes(artist, title) {
+        const searchText = artist === title ? title : `${artist} — ${title}`;
+        const cacheKey = searchText.toLowerCase();
 
-    // 4) other fields: now_playing, current, current_track
-    if ((!song || !artist) && data.now_playing) {
-        if (!song && data.now_playing.title) song = data.now_playing.title;
-        if (!artist && data.now_playing.artist) artist = data.now_playing.artist;
-    }
-    if ((!song || !artist) && data.current_track) {
-        if (!song && data.current_track.title) song = data.current_track.title;
-        if (!artist && data.current_track.artist) artist = data.current_track.artist;
-    }
-
-    // History possibilities: data.song_history (array of objects), data.history (array), data.playlist
-    if (Array.isArray(data.song_history)) {
-        history = data.song_history.map(item => {
-            if (typeof item === 'string') {
-                const parts = item.split(' - ').map(s => s.trim());
-                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                return { song: item, artist: 'Unknown' };
-            } else if (item && item.song) {
-                if (typeof item.song === 'object') {
-                    return { song: item.song.title || 'Unknown', artist: item.song.artist || 'Unknown' };
-                } else {
-                    // item.song might be a string "Artist - Title"
-                    const parts = String(item.song).split(' - ').map(s => s.trim());
-                    if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                    return { song: String(item.song), artist: item.artist || 'Unknown' };
-                }
-            } else if (item && item.title) {
-                return { song: item.title, artist: item.artist || 'Unknown' };
-            } else {
-                return { song: 'Unknown', artist: 'Unknown' };
-            }
-        });
-    } else if (Array.isArray(data.history)) {
-        history = data.history.map(item => {
-            if (typeof item === 'string') {
-                const parts = item.split(' - ').map(s => s.trim());
-                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                return { song: item, artist: 'Unknown' };
-            } else if (item && item.song && item.artist) {
-                return { song: item.song, artist: item.artist };
-            } else if (item && item.title) {
-                return { song: item.title, artist: item.artist || 'Unknown' };
-            } else {
-                return { song: 'Unknown', artist: 'Unknown' };
-            }
-        });
-    } else if (Array.isArray(data.playlist)) {
-        history = data.playlist.map(item => {
-            if (typeof item === 'string') {
-                const parts = item.split(' - ').map(s => s.trim());
-                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                return { song: item, artist: 'Unknown' };
-            } else if (item && item.title) {
-                return { song: item.title, artist: item.artist || 'Unknown' };
-            } else {
-                return { song: 'Unknown', artist: 'Unknown' };
-            }
-        });
-    }
-
-    // Normalize defaults
-    if (!song) song = "Unknown";
-    if (!artist) artist = "Unknown";
-
-    return { song, artist, history };
-}
-
-// Main streaming data fetch
-async function getStreamingData() {
-    try {
-        const data = await fetchStreamingData(METADATA_API_URL);
-        if (!data) return;
-
-        const parsed = parseNowPlaying(data);
-        const page = new Page();
-
-        const safeSong = (parsed.song || "Unknown").trim();
-        const safeArtist = (parsed.artist || "Unknown").trim();
-
-        if (safeSong !== currentSongName) {
-            document.title = `${safeSong} - ${safeArtist} | ${RADIO_NAME}`;
-            page.refreshCover(safeSong, safeArtist);
-            page.refreshCurrentSong(safeSong, safeArtist);
-            page.refreshLyrics(safeSong, safeArtist);
-
-            const historyContainer = document.getElementById("historicSong");
-            if (historyContainer) historyContainer.innerHTML = "";
-
-            const historyArray = Array.isArray(parsed.history) ? parsed.history.slice(-4) : [];
-            for (let i = 0; i < historyArray.length; i++) {
-                const songInfo = historyArray[i];
-                const article = document.createElement("article");
-                article.classList.add("col-12", "col-md-6");
-                article.innerHTML = `
-                    <div class="cover-historic" style="background-image: url('img/cover.png');"></div>
-                    <div class="music-info">
-                      <p class="song">${songInfo.song || "Unknown"}</p>
-                      <p class="artist">${songInfo.artist || "Unknown"}</p>
-                    </div>
-                  `;
-                if (historyContainer) historyContainer.appendChild(article);
-                try {
-                    page.refreshHistoryItem(songInfo, i);
-                } catch (error) {
-                    // ignore
-                }
-            }
-
-            currentSongName = safeSong;
+        if (this.coverCache.has(cacheKey)) {
+            return this.coverCache.get(cacheKey);
         }
-    } catch (error) {
-        // ignore streaming errors silently
-    }
-}
 
-// Safe fetch wrapper for metadata
-async function fetchStreamingData(apiUrl) {
-    try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error(`API request error: ${response.status} ${response.statusText}`);
-        return await response.json();
-    } catch {
-        return null;
-    }
-}
-
-// Change iTunes image size helper
-function changeImageSize(url, size) {
-    if (!url) return url;
-    const parts = url.split("/");
-    const filename = parts.pop();
-    const newFilename = `${size}${filename.substring(filename.lastIndexOf("."))}`;
-    return parts.join("/") + "/" + newFilename;
-}
-
-// Get cover/thumbnail data from iTunes (cached)
-const getCoverDataFromITunes = async (artist, title, defaultArt, defaultCover) => {
-    const searchText = (artist === title) ? title : `${artist} - ${title}`;
-    const cacheKey = String(searchText || '').toLowerCase();
-    if (coverCache[cacheKey]) {
-        return coverCache[cacheKey];
-    }
-
-    try {
-        const response = await fetch(`https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`);
-        if (response.status === 403) {
-            return { title, artist, art: defaultArt, cover: defaultCover, stream_url: "#not-found" };
-        }
-        const data = response.ok ? await response.json() : {};
-        if (!data.results || data.results.length === 0) {
-            return { title, artist, art: defaultArt, cover: defaultCover, stream_url: "#not-found" };
-        }
-        const itunes = data.results[0];
-        const results = {
-            title: title,
-            artist: artist,
-            thumbnail: itunes.artworkUrl100 || defaultArt,
-            art: itunes.artworkUrl100 ? changeImageSize(itunes.artworkUrl100, "600x600") : defaultArt,
-            cover: itunes.artworkUrl100 ? changeImageSize(itunes.artworkUrl100, "1500x1500") : defaultCover,
-            stream_url: "#not-found"
+        const fallback = {
+            art: CONFIG.DEFAULT_COVER,
+            cover: CONFIG.DEFAULT_COVER
         };
-        coverCache[cacheKey] = results;
-        return results;
-    } catch (err) {
-        return { title, artist, art: defaultArt, cover: defaultCover, stream_url: "#not-found" };
+
+        try {
+            const response = await fetch(
+                `https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`
+            );
+            if (!response.ok || response.status === 403) return fallback;
+
+            const data = await response.json();
+            if (!data.results || data.results.length === 0) return fallback;
+
+            const itunes = data.results[0];
+            const thumb = itunes.artworkUrl100 || CONFIG.DEFAULT_COVER;
+            const result = {
+                art: thumb !== CONFIG.DEFAULT_COVER ? this._resizeImageUrl(thumb, '600x600') : thumb,
+                cover: thumb !== CONFIG.DEFAULT_COVER ? this._resizeImageUrl(thumb, '1500x1500') : thumb
+            };
+
+            this.coverCache.set(cacheKey, result);
+            return result;
+        } catch (err) {
+            return fallback;
+        }
     }
-};
 
-// --- AUDIO CONTROLS ---
-var audio = new Audio(STREAM_URL);
-
-class Player {
-    play() {
-        // Must be called from a user gesture
-        audio.play();
-        const defaultVolume = (document.getElementById('volume') && document.getElementById('volume').value) || 80;
-        const storedVolume = (typeof Storage !== 'undefined' && localStorage.getItem('volume')) || defaultVolume;
-        audio.volume = intToDecimal(storedVolume);
-        const volIndicator = document.getElementById('volIndicator');
-        if (volIndicator) volIndicator.innerHTML = storedVolume;
+    _resizeImageUrl(url, size) {
+        if (!url) return url;
+        const parts = url.split('/');
+        const filename = parts.pop();
+        const ext = filename.substring(filename.lastIndexOf('.'));
+        return parts.join('/') + '/' + size + ext;
     }
-    pause() {
-        audio.pause();
+
+    /* --------------------------------------------------------------------
+       Media Session API
+       -------------------------------------------------------------------- */
+    _setupMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+
+        navigator.mediaSession.setActionHandler('play', () => this._play());
+        navigator.mediaSession.setActionHandler('pause', () => this._pause());
+        navigator.mediaSession.setActionHandler('stop', () => this._pause());
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
     }
-}
 
-audio.onplay = function () {
-    const button = document.getElementById('playerButton');
-    if (button && button.className === 'fa fa-play') button.className = 'fa fa-pause';
-};
-audio.onpause = function () {
-    const button = document.getElementById('playerButton');
-    if (button && button.className === 'fa fa-pause') button.className = 'fa fa-play';
-};
-audio.onvolumechange = function () {
-    if (audio.volume > 0) audio.muted = false;
-};
-audio.onerror = function () {
-    const confirmed = confirm('Stream Down / Network Error.\nClick OK to try again.');
-    if (confirmed) window.location.reload();
-};
+    _updateMediaSessionMetadata(song, artist) {
+        if (!('mediaSession' in navigator)) return;
 
-// Volume slider event
-const volumeElem = document.getElementById('volume');
-if (volumeElem) {
-    volumeElem.oninput = function () {
-        audio.volume = intToDecimal(this.value);
-        const page = new Page();
-        page.updateVolumeIndicator(this.value);
-    };
-}
+        this._getCoverDataFromITunes(artist, song).then((data) => {
+            const artwork = [
+                { src: data.art, sizes: '96x96', type: 'image/png' },
+                { src: data.art, sizes: '128x128', type: 'image/png' },
+                { src: data.art, sizes: '192x192', type: 'image/png' },
+                { src: data.art, sizes: '256x256', type: 'image/png' },
+                { src: data.art, sizes: '384x384', type: 'image/png' },
+                { src: data.art, sizes: '512x512', type: 'image/png' }
+            ];
 
-function togglePlay() {
-    const playerButton = document.getElementById("playerButton");
-    if (!playerButton) return;
-    const isPlaying = playerButton.classList.contains("fa-pause-circle");
-    if (isPlaying) {
-        playerButton.classList.remove("fa-pause-circle");
-        playerButton.classList.add("fa-play-circle");
-        playerButton.style.textShadow = "0 0 5px black";
-        audio.pause();
-    } else {
-        playerButton.classList.remove("fa-play-circle");
-        playerButton.classList.add("fa-pause-circle");
-        playerButton.style.textShadow = "0 0 5px black";
-        audio.load();
-        audio.play().catch(err => {
-            // play() may fail if not called directly by user gesture; ignore
-            console.warn('Audio play failed (gesture required):', err);
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: song,
+                artist: artist,
+                album: CONFIG.RADIO_NAME,
+                artwork
+            });
         });
     }
-}
 
-function volumeUp() {
-    const vol = audio.volume;
-    if (audio && vol >= 0 && vol < 1) {
-        audio.volume = Math.min(1, (parseFloat(vol) + 0.01));
+    _updateMediaSessionPlaybackState(state) {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = state;
+        }
     }
-}
-function volumeDown() {
-    const vol = audio.volume;
-    if (audio && vol > 0) {
-        audio.volume = Math.max(0, (parseFloat(vol) - 0.01));
+
+    /* --------------------------------------------------------------------
+       Utilities
+       -------------------------------------------------------------------- */
+    _clamp(num, min, max) {
+        return Math.min(Math.max(num, min), max);
     }
-}
-function mute() {
-    if (!audio.muted) {
-        const volIndicator = document.getElementById('volIndicator');
-        const volumeInput = document.getElementById('volume');
-        if (volIndicator) volIndicator.innerHTML = 0;
-        if (volumeInput) volumeInput.value = 0;
-        audio.volume = 0;
-        audio.muted = true;
-    } else {
-        const storedVolume = localStorage.getItem('volume') || 80;
-        const volIndicator = document.getElementById('volIndicator');
-        const volumeInput = document.getElementById('volume');
-        if (volIndicator) volIndicator.innerHTML = storedVolume;
-        if (volumeInput) volumeInput.value = storedVolume;
-        audio.volume = intToDecimal(storedVolume);
-        audio.muted = false;
+
+    _escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
-document.addEventListener('keydown', function (event) {
-    const key = event.key;
-    const slideVolume = document.getElementById('volume');
-    const page = new Page();
-
-    switch (key) {
-        case 'ArrowUp':
-            volumeUp();
-            if (slideVolume) slideVolume.value = decimalToInt(audio.volume);
-            page.updateVolumeIndicator(decimalToInt(audio.volume));
-            break;
-        case 'ArrowDown':
-            volumeDown();
-            if (slideVolume) slideVolume.value = decimalToInt(audio.volume);
-            page.updateVolumeIndicator(decimalToInt(audio.volume));
-            break;
-        case ' ':
-        case 'Spacebar':
-        case 'p':
-        case 'P':
-            togglePlay();
-            break;
-        case 'm':
-        case 'M':
-            mute();
-            break;
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-            const volumeValue = parseInt(key);
-            audio.volume = volumeValue / 10;
-            if (slideVolume) slideVolume.value = volumeValue * 10;
-            page.updateVolumeIndicator(volumeValue * 10);
-            break;
-    }
+/* ========================================================================
+   Bootstrap
+   ======================================================================== */
+window.addEventListener('DOMContentLoaded', () => {
+    new RadioApp();
 });
-
-function intToDecimal(vol) {
-    return Number(vol) / 100;
-}
-function decimalToInt(vol) {
-    return Number(vol) * 100;
-}
