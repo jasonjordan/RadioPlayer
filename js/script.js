@@ -111,15 +111,7 @@ class RadioApp {
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this._handleKeydown(e));
 
-        // Page Visibility API — conserve bandwidth when tab is hidden
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                this._stopPolling();
-            } else {
-                this._fetchStreamingData();
-                this._startPolling();
-            }
-        });
+
 
         // Auto-reconnect stream on error or stall
         this._setupAudioRecovery();
