@@ -368,12 +368,12 @@ input[type=range]::-ms-thumb {
 @media(max-width: 767px) {
     .info-current-song h2 {
         font-size: 26px !important;
-        white-space: nowrap;
+        white-space: normal;
         max-width: 100%;
     }
     .info-current-song h3 {
         font-size: 18px !important;
-        white-space: nowrap;
+        white-space: normal;
         max-width: 100%;
     }
     .lyrics, .support-btn {
