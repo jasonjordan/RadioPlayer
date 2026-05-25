@@ -13,16 +13,31 @@ const STATIC_ASSETS = [
     '/manifest.json'
 ];
 
-// Install: cache core assets
+// Install: cache core assets with graceful fallback
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[ServiceWorker] Caching static assets');
-                return cache.addAll(STATIC_ASSETS);
+                // Try to add all assets, but don't fail if some are missing
+                return cache.addAll(STATIC_ASSETS)
+                    .catch((err) => {
+                        console.warn('[ServiceWorker] Some assets failed to cache (this may be expected for CDN resources):', err);
+                        // Continue with installation even if some assets fail
+                        // Try adding assets individually to identify problematic ones
+                        return Promise.allSettled(
+                            STATIC_ASSETS.map(asset => cache.add(asset))
+                        ).then((results) => {
+                            const failed = results
+                                .map((r, i) => ({ asset: STATIC_ASSETS[i], status: r.status }))
+                                .filter(r => r.status === 'rejected');
+                            if (failed.length > 0) {
+                                console.warn('[ServiceWorker] Failed to cache:', failed);
+                            }
+                        });
+                    });
             })
             .then(() => self.skipWaiting())
-            .catch((err) => console.warn('[ServiceWorker] Cache failure:', err))
     );
 });
 
@@ -74,19 +89,33 @@ self.addEventListener('fetch', (event) => {
                 // Refresh cache in background
                 fetch(request)
                     .then((networkResponse) => {
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, networkResponse.clone());
-                        });
+                        if (networkResponse && networkResponse.status === 200) {
+                            caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(request, networkResponse.clone());
+                            });
+                        }
                     })
                     .catch(() => { /* ignore background refresh failures */ });
                 return cachedResponse;
             }
 
-            return fetch(request).then((networkResponse) => {
-                const clone = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-                return networkResponse;
-            });
+            return fetch(request)
+                .then((networkResponse) => {
+                    // Only cache successful responses
+                    if (networkResponse && networkResponse.status === 200) {
+                        const clone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+                    }
+                    return networkResponse;
+                })
+                .catch((err) => {
+                    console.warn('[ServiceWorker] Fetch failed for:', request.url, err);
+                    // Return a custom offline page or fallback if desired
+                    return new Response('Offline - resource not available', {
+                        status: 503,
+                        statusText: 'Service Unavailable'
+                    });
+                });
         })
     );
 });
