@@ -169,7 +169,7 @@ body {
     text-decoration: underline;
 }
 
-.lyrics {
+.lyrics, .support-btn {
     text-transform: uppercase;
     text-decoration: none;
     color: #fff;
@@ -186,14 +186,15 @@ body {
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.lyrics:hover, .lyrics:active, .lyrics:focus {
+.lyrics:hover, .lyrics:active, .lyrics:focus,
+.support-btn:hover, .support-btn:active, .support-btn:focus {
     text-decoration: none;
     color: #000;
     background-color: #fff;
     text-shadow: none;
 }
 
-.lyrics:visited {
+.lyrics:visited, .support-btn:visited {
     text-decoration: none;
     color: #fff;
 }
