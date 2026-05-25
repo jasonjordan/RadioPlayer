@@ -171,12 +171,28 @@
                         <h5 id="historyInfoArtist" class="mb-3" style="color: #00E1E7;"></h5>
                         
                         <div class="row text-left mt-4" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-                            <div class="col-5 mb-2 text-muted">Album:</div>
-                            <div class="col-7 mb-2" id="historyInfoAlbum"></div>
-                            <div class="col-5 mb-2 text-muted">Released:</div>
-                            <div class="col-7 mb-2" id="historyInfoYear"></div>
-                            <div class="col-5 mb-2 text-muted">Genre:</div>
-                            <div class="col-7 mb-2" id="historyInfoGenre"></div>
+                            <div class="col-4 mb-2 text-muted">Album:</div>
+                            <div class="col-8 mb-2" id="historyInfoAlbum"></div>
+                            <div class="col-4 mb-2 text-muted">Released:</div>
+                            <div class="col-8 mb-2" id="historyInfoYear"></div>
+                            <div class="col-4 mb-2 text-muted">Genre:</div>
+                            <div class="col-8 mb-2" id="historyInfoGenre"></div>
+                            <div class="col-4 mb-2 text-muted">Duration:</div>
+                            <div class="col-8 mb-2" id="historyInfoDuration"></div>
+                        </div>
+                        
+                        <div id="historyInfoPreviewContainer" class="mt-4" style="display: none;">
+                            <h6 class="text-left mb-2 text-muted">Audio Preview</h6>
+                            <audio id="historyInfoPreviewAudio" controls style="width: 100%; height: 40px; outline: none; border-radius: 5px;"></audio>
+                        </div>
+                        
+                        <div id="historyInfoBioContainer" class="mt-4 text-left" style="display: none; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                            <h6 class="mb-2 text-muted">Artist Biography</h6>
+                            <div id="historyInfoBio" style="font-size: 14px; max-height: 200px; overflow-y: auto; padding-right: 5px; opacity: 0.9;"></div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a id="historyInfoAppleLink" href="#" target="_blank" class="btn btn-outline-info btn-block" style="display: none; border-color: #00E1E7; color: #00E1E7;"><i class="fa fa-music mr-2"></i>Listen on Apple Music</a>
                         </div>
                     </div>
                 </div>

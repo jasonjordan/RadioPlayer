@@ -32,6 +32,7 @@ class RadioApp {
         this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
         this.hasLoaded = false;
         this.historyCache = [];
+        this.lastJingleTimestamp = 0;
 
         // Cached DOM refs
         this.dom = {};
@@ -122,6 +123,17 @@ class RadioApp {
 
         // Auto-reconnect stream on error or stall
         this._setupAudioRecovery();
+
+        // Stop preview audio when History modal closes
+        if (window.$) {
+            $('#modalHistoryInfo').on('hidden.bs.modal', () => {
+                const previewAudio = document.getElementById('historyInfoPreviewAudio');
+                if (previewAudio) {
+                    previewAudio.pause();
+                    previewAudio.src = '';
+                }
+            });
+        }
 
         // Responsive cover art
         window.addEventListener('resize', () => this._resizeCover());
@@ -408,26 +420,32 @@ class RadioApp {
     }
 
     async _openHistoryModal(song, artist, defaultCover) {
-        if (!window.$) return; // ensure jQuery is loaded for Bootstrap modals
+        if (!window.$) return;
         $('#modalHistoryInfo').modal('show');
         document.getElementById('historyInfoLoading').style.display = 'block';
         document.getElementById('historyInfoContent').style.display = 'none';
 
+        // Reset fields
+        document.getElementById('historyInfoSong').textContent = song;
+        document.getElementById('historyInfoArtist').textContent = artist;
+        document.getElementById('historyInfoCover').src = defaultCover || CONFIG.DEFAULT_COVER;
+        document.getElementById('historyInfoPreviewContainer').style.display = 'none';
+        document.getElementById('historyInfoBioContainer').style.display = 'none';
+        document.getElementById('historyInfoAppleLink').style.display = 'none';
+
         try {
-            let url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + song)}&limit=1`;
+            // Fetch iTunes Track Info
+            let url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + song)}&limit=1&media=music&entity=song`;
             let res = await fetch(url);
             let data = await res.json();
 
             if (!data.results || data.results.length === 0) {
-                url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&limit=1`;
+                url = `https://itunes.apple.com/search?term=${encodeURIComponent(song)}&limit=1&media=music&entity=song`;
                 res = await fetch(url);
                 data = await res.json();
             }
 
             const track = data.results && data.results[0] ? data.results[0] : null;
-
-            document.getElementById('historyInfoSong').textContent = song;
-            document.getElementById('historyInfoArtist').textContent = artist;
 
             if (track) {
                 const cover = track.artworkUrl100 ? track.artworkUrl100.replace('100x100', '600x600') : defaultCover;
@@ -435,24 +453,52 @@ class RadioApp {
                 document.getElementById('historyInfoAlbum').textContent = track.collectionName || 'Unknown';
                 document.getElementById('historyInfoYear').textContent = track.releaseDate ? new Date(track.releaseDate).getFullYear() : 'Unknown';
                 document.getElementById('historyInfoGenre').textContent = track.primaryGenreName || 'Unknown';
+                
+                // Track Duration
+                document.getElementById('historyInfoDuration').textContent = this._formatDuration(track.trackTimeMillis);
+                
+                // Audio Preview
+                if (track.previewUrl) {
+                    document.getElementById('historyInfoPreviewContainer').style.display = 'block';
+                    document.getElementById('historyInfoPreviewAudio').src = track.previewUrl;
+                }
+                
+                // Apple Music Link
+                if (track.trackViewUrl) {
+                    const appleLink = document.getElementById('historyInfoAppleLink');
+                    appleLink.href = track.trackViewUrl;
+                    appleLink.style.display = 'block';
+                }
             } else {
-                document.getElementById('historyInfoCover').src = defaultCover || CONFIG.DEFAULT_COVER;
                 document.getElementById('historyInfoAlbum').textContent = 'Not Found on iTunes';
                 document.getElementById('historyInfoYear').textContent = '-';
                 document.getElementById('historyInfoGenre').textContent = '-';
+                document.getElementById('historyInfoDuration').textContent = '-';
+            }
+
+            // Fetch Wikipedia Bio
+            if (artist && artist !== 'Unknown' && artist !== '') {
+                const bioUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&redirects=1&titles=${encodeURIComponent(artist)}&format=json&origin=*`;
+                const bioRes = await fetch(bioUrl);
+                const bioData = await bioRes.json();
+                const pages = bioData.query.pages;
+                const pageId = Object.keys(pages)[0];
+                
+                if (pageId !== '-1' && pages[pageId].extract) {
+                    document.getElementById('historyInfoBio').textContent = pages[pageId].extract;
+                    document.getElementById('historyInfoBioContainer').style.display = 'block';
+                }
             }
 
             document.getElementById('historyInfoLoading').style.display = 'none';
             document.getElementById('historyInfoContent').style.display = 'block';
 
         } catch (err) {
-            console.error('Error fetching iTunes data:', err);
-            document.getElementById('historyInfoCover').src = defaultCover || CONFIG.DEFAULT_COVER;
-            document.getElementById('historyInfoSong').textContent = song;
-            document.getElementById('historyInfoArtist').textContent = artist;
+            console.error('Error fetching modal data:', err);
             document.getElementById('historyInfoAlbum').textContent = 'Network Error';
             document.getElementById('historyInfoYear').textContent = '-';
             document.getElementById('historyInfoGenre').textContent = '-';
+            document.getElementById('historyInfoDuration').textContent = '-';
             
             document.getElementById('historyInfoLoading').style.display = 'none';
             document.getElementById('historyInfoContent').style.display = 'block';
@@ -496,6 +542,14 @@ class RadioApp {
     /* --------------------------------------------------------------------
        Metadata parsers
        -------------------------------------------------------------------- */
+    _formatDuration(ms) {
+        if (!ms) return 'Unknown';
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
     _parseNowPlaying(data) {
         let song = null;
         let artist = null;
@@ -551,9 +605,16 @@ class RadioApp {
             }
         }
         
-        if (this._isJingleOrStab(song, artist)) {
+        let isJingle = this._isJingleOrStab(song, artist);
+        
+        if (isJingle) {
+            this.lastJingleTimestamp = Date.now();
+        }
+        
+        if (isJingle || (Date.now() - this.lastJingleTimestamp < 5000)) {
             song = 'Happy Radio';
             artist = '';
+            data.coverart = CONFIG.DEFAULT_COVER;
         }
 
         // History parsing
