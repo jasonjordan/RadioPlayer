@@ -39,6 +39,7 @@ class RadioApp {
         this.dom = {};
 
         // Initialize
+        this._setupDebugLogger();
         this._cacheDOM();
         this._bindEvents();
         this._setInitialVolume();
@@ -50,6 +51,36 @@ class RadioApp {
 
         // Initial data fetch
         this._fetchStreamingData();
+    }
+
+    _setupDebugLogger() {
+        if (!window.location.search.includes('debug=1')) return;
+        
+        const debugUI = document.createElement('div');
+        debugUI.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:30vh; background:rgba(0,0,0,0.8); color:#0f0; font-family:monospace; font-size:10px; z-index:999999; overflow-y:scroll; padding:10px; pointer-events:auto;';
+        document.body.appendChild(debugUI);
+
+        const ogLog = console.log;
+        const ogWarn = console.warn;
+        const ogError = console.error;
+
+        const printMsg = (type, args) => {
+            const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+            const line = document.createElement('div');
+            line.textContent = `[${type}] ${msg}`;
+            line.style.color = type === 'ERROR' ? '#f00' : (type === 'WARN' ? '#ff0' : '#0f0');
+            debugUI.appendChild(line);
+            debugUI.scrollTop = debugUI.scrollHeight;
+        };
+
+        console.log = function() { ogLog.apply(console, arguments); printMsg('LOG', arguments); };
+        console.warn = function() { ogWarn.apply(console, arguments); printMsg('WARN', arguments); };
+        console.error = function() { ogError.apply(console, arguments); printMsg('ERROR', arguments); };
+        
+        window.addEventListener('error', (e) => console.error('Uncaught', e.message));
+        window.addEventListener('unhandledrejection', (e) => console.error('Promise Rejection', e.reason ? e.reason.message : e.reason));
+        
+        console.log('--- DEBUG MODE ENABLED ---');
     }
 
     /* --------------------------------------------------------------------
