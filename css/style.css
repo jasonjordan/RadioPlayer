@@ -81,9 +81,8 @@ body {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-     border-radius: 10px;
-  
-    transition: background-image 1s;
+    border-radius: 10px;
+    transition: opacity 0.5s ease-in-out;
 }
 
 .logo {

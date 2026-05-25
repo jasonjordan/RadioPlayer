@@ -399,6 +399,40 @@ class RadioApp {
         }
     }
 
+    async _openArtistInfoModal(artist) {
+        if (!window.$) return;
+        $('#modalArtistInfo').modal('show');
+        document.getElementById('artistInfoLoading').style.display = 'block';
+        document.getElementById('artistInfoContent').style.display = 'none';
+        
+        try {
+            const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&titles=${encodeURIComponent(artist)}&format=json&origin=*`;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            const pages = data.query.pages;
+            const pageId = Object.keys(pages)[0];
+            const extract = pages[pageId].extract;
+            
+            document.getElementById('artistInfoName').textContent = artist;
+            
+            if (pageId === '-1' || !extract) {
+                document.getElementById('artistInfoBio').innerHTML = `<p>No biography found on Wikipedia for <strong>${this._escapeHtml(artist)}</strong>.</p>`;
+            } else {
+                document.getElementById('artistInfoBio').innerHTML = extract;
+            }
+            
+            document.getElementById('artistInfoLoading').style.display = 'none';
+            document.getElementById('artistInfoContent').style.display = 'block';
+        } catch (err) {
+            console.error('Error fetching Wikipedia data:', err);
+            document.getElementById('artistInfoName').textContent = artist;
+            document.getElementById('artistInfoBio').innerHTML = '<p class="text-danger">Network Error: Unable to fetch biography.</p>';
+            document.getElementById('artistInfoLoading').style.display = 'none';
+            document.getElementById('artistInfoContent').style.display = 'block';
+        }
+    }
+
     /* --------------------------------------------------------------------
        Metadata parsers
        -------------------------------------------------------------------- */
@@ -548,7 +582,10 @@ class RadioApp {
 
             const artistInfoBtn = document.getElementById('artistInfoBtn');
             if (artistInfoBtn) {
-                artistInfoBtn.href = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(artist)}`;
+                artistInfoBtn.onclick = (e) => {
+                    e.preventDefault();
+                    this._openArtistInfoModal(artist);
+                };
             }
         }, 500);
     }
