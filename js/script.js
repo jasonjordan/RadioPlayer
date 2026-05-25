@@ -462,20 +462,28 @@ class RadioApp {
 
             if (!this.hasLoaded) {
                 this.hasLoaded = true;
-                const overlay = document.getElementById('startupOverlay');
-                if (overlay) {
-                    setTimeout(() => {
-                        overlay.style.opacity = '0';
-                        setTimeout(() => overlay.remove(), 3000);
-                    }, 1000);
-                }
+                this._removeOverlay();
                 this._play();
             }
         } catch (err) {
-            // Silently ignore streaming errors to avoid UI noise
             if (err.name !== 'AbortError') {
                 console.warn('Metadata fetch failed:', err.message);
             }
+        } finally {
+            if (!this.hasLoaded) {
+                this.hasLoaded = true;
+                this._removeOverlay();
+            }
+        }
+    }
+
+    _removeOverlay() {
+        const overlay = document.getElementById('startupOverlay');
+        if (overlay) {
+            setTimeout(() => {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 3000);
+            }, 1000);
         }
     }
 
