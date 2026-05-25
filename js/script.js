@@ -498,6 +498,12 @@ class RadioApp {
             }
 
             if (song !== this.currentSongName) {
+                // Restore UI elements if recovering from fallback
+                const historicSection = document.querySelector('.historic');
+                if (historicSection) historicSection.style.display = '';
+                const callLyrics = document.querySelector('.call-lyrics');
+                if (callLyrics) callLyrics.style.display = '';
+
                 document.title = `${song} ${artist ? '— ' + artist : ''} | ${CONFIG.RADIO_NAME}`;
                 this._refreshCover(parsed.coverart);
                 this._refreshCurrentSong(song, artist);
@@ -530,6 +536,9 @@ class RadioApp {
 
                 const historicSection = document.querySelector('.historic');
                 if (historicSection) historicSection.style.display = 'none';
+                
+                const callLyrics = document.querySelector('.call-lyrics');
+                if (callLyrics) callLyrics.style.display = 'none';
             }
         } finally {
             if (!this.hasLoaded) {
