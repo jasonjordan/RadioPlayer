@@ -500,9 +500,12 @@ class RadioApp {
             if (song !== this.currentSongName) {
                 // Restore UI elements if recovering from fallback
                 const historicSection = document.querySelector('.historic');
-                if (historicSection) historicSection.style.display = '';
+                if (historicSection) historicSection.classList.remove('d-none');
                 const callLyrics = document.querySelector('.call-lyrics');
-                if (callLyrics) callLyrics.style.display = '';
+                if (callLyrics) {
+                    callLyrics.classList.remove('d-none');
+                    callLyrics.classList.add('d-flex');
+                }
 
                 document.title = `${song} ${artist ? '— ' + artist : ''} | ${CONFIG.RADIO_NAME}`;
                 this._refreshCover(parsed.coverart);
@@ -535,10 +538,13 @@ class RadioApp {
                 this.currentArtistName = fallbackArtist;
 
                 const historicSection = document.querySelector('.historic');
-                if (historicSection) historicSection.style.display = 'none';
+                if (historicSection) historicSection.classList.add('d-none');
                 
                 const callLyrics = document.querySelector('.call-lyrics');
-                if (callLyrics) callLyrics.style.display = 'none';
+                if (callLyrics) {
+                    callLyrics.classList.remove('d-flex');
+                    callLyrics.classList.add('d-none');
+                }
             }
         } finally {
             if (!this.hasLoaded) {
@@ -986,7 +992,7 @@ class RadioApp {
         if (!this.dom.historicSong) return;
 
         const historicSection = document.querySelector('.historic');
-        if (historicSection) historicSection.style.display = ''; // Restore if hidden
+        if (historicSection) historicSection.classList.remove('d-none'); // Restore if hidden
 
         if (!historyArray || !Array.isArray(historyArray) || historyArray.length === 0) {
             this.dom.historicSong.innerHTML = '<p class="text-white opacity-50 mb-0">No history available</p>';
