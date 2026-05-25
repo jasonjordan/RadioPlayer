@@ -488,6 +488,11 @@ class RadioApp {
             songEl.classList.add('slideInRight');
             artistEl.classList.remove('slideOutLeft');
             artistEl.classList.add('slideInRight');
+
+            const artistInfoBtn = document.getElementById('artistInfoBtn');
+            if (artistInfoBtn) {
+                artistInfoBtn.href = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(artist)}`;
+            }
         }, 500);
     }
 
