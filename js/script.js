@@ -413,7 +413,7 @@ class RadioApp {
     _parseHistoryArray(source, covers = []) {
         if (!Array.isArray(source)) return [];
 
-        return source.map((item, index) => {
+        const parsedItems = source.map((item, index) => {
             let parsedSong = 'Unknown';
             let parsedArtist = 'Unknown';
 
@@ -451,6 +451,14 @@ class RadioApp {
                 artist: parsedArtist, 
                 coverart: covers[index] || CONFIG.DEFAULT_COVER 
             };
+        });
+
+        return parsedItems.filter(item => {
+            const sLower = item.song.toLowerCase();
+            const aLower = item.artist.toLowerCase();
+            if (sLower.includes('happy radio') || aLower.includes('happy radio')) return false;
+            if (sLower === 'unknown' || aLower === 'unknown') return false;
+            return true;
         });
     }
 
