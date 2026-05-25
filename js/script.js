@@ -11,7 +11,10 @@ const CONFIG = Object.freeze({
     FETCH_TIMEOUT: 8000,       // ms
     HISTORY_LIMIT: 4,
     DEFAULT_VOLUME: 80,
-    DEFAULT_COVER: 'img/cover.png'
+    DEFAULT_COVER: 'img/cover.png',
+    COVER_CACHE_LIMIT: 100,    // Prevent memory leak
+    // CORS proxy for iTunes API (uses allorigins.win - free CORS proxy)
+    CORS_PROXY_URL: 'https://api.allorigins.win/raw?url='
 });
 
 /* ========================================================================
@@ -322,7 +325,9 @@ class RadioApp {
             }
         } catch (err) {
             // Silently ignore streaming errors to avoid UI noise
-            console.warn('Metadata fetch failed:', err);
+            if (err.name !== 'AbortError') {
+                console.warn('Metadata fetch failed:', err);
+            }
         }
     }
 
@@ -564,14 +569,21 @@ class RadioApp {
     }
 
     /* --------------------------------------------------------------------
-       Cover art helpers
+       Cover art helpers with CORS workaround
        -------------------------------------------------------------------- */
     async _getCoverDataFromITunes(artist, title) {
         const searchText = artist === title ? title : `${artist} — ${title}`;
         const cacheKey = searchText.toLowerCase();
 
+        // Check cache first
         if (this.coverCache.has(cacheKey)) {
             return this.coverCache.get(cacheKey);
+        }
+
+        // Prevent memory leak by limiting cache size
+        if (this.coverCache.size >= CONFIG.COVER_CACHE_LIMIT) {
+            const firstKey = this.coverCache.keys().next().value;
+            this.coverCache.delete(firstKey);
         }
 
         const fallback = {
@@ -580,13 +592,22 @@ class RadioApp {
         };
 
         try {
-            const response = await fetch(
-                `https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`
-            );
-            if (!response.ok || response.status === 403) return fallback;
+            // Use CORS proxy to bypass iTunes API CORS restrictions
+            const itunesUrl = `https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`;
+            const proxiedUrl = CONFIG.CORS_PROXY_URL + encodeURIComponent(itunesUrl);
+
+            const response = await fetch(proxiedUrl);
+            if (!response.ok || response.status === 403) {
+                // Fallback if proxy fails
+                this.coverCache.set(cacheKey, fallback);
+                return fallback;
+            }
 
             const data = await response.json();
-            if (!data.results || data.results.length === 0) return fallback;
+            if (!data.results || data.results.length === 0) {
+                this.coverCache.set(cacheKey, fallback);
+                return fallback;
+            }
 
             const itunes = data.results[0];
             const thumb = itunes.artworkUrl100 || CONFIG.DEFAULT_COVER;
@@ -598,6 +619,8 @@ class RadioApp {
             this.coverCache.set(cacheKey, result);
             return result;
         } catch (err) {
+            console.warn('Cover art fetch failed:', err);
+            this.coverCache.set(cacheKey, fallback);
             return fallback;
         }
     }
