@@ -12,10 +12,7 @@ const CONFIG = Object.freeze({
     HISTORY_LIMIT: 4,
     DEFAULT_VOLUME: 80,
     DEFAULT_COVER: 'img/cover.png',
-    COVER_CACHE_LIMIT: 100,    // Prevent memory leak
-    // Alternative: Use a working CORS proxy or backend endpoint
-    // Option 1: Use corsfix proxy
-    CORS_PROXY_URL: 'https://corsproxy.io/?'
+    COVER_CACHE_LIMIT: 100     // Prevent memory leak
 });
 
 /* ========================================================================
@@ -327,7 +324,7 @@ class RadioApp {
         } catch (err) {
             // Silently ignore streaming errors to avoid UI noise
             if (err.name !== 'AbortError') {
-                console.warn('Metadata fetch failed:', err);
+                console.warn('Metadata fetch failed:', err.message);
             }
         }
     }
@@ -467,7 +464,7 @@ class RadioApp {
         if (!this.dom.currentCoverArt || !this.dom.bgCover) return;
 
         try {
-            const data = await this._getCoverDataFromITunes(artist, song);
+            const data = await this._getCoverData(artist, song);
             this.dom.currentCoverArt.style.backgroundImage = `url('${data.art}')`;
             this.dom.bgCover.style.backgroundImage = `url('${data.cover}')`;
 
@@ -509,7 +506,7 @@ class RadioApp {
             });
 
             // Fetch cover asynchronously
-            this._getCoverDataFromITunes(songArtist, songTitle)
+            this._getCoverData(songArtist, songTitle)
                 .then((data) => {
                     const coverEl = article.querySelector('.cover-historic');
                     if (coverEl) coverEl.style.backgroundImage = `url('${data.art}')`;
@@ -570,9 +567,9 @@ class RadioApp {
     }
 
     /* --------------------------------------------------------------------
-       Cover art helpers with improved CORS handling
+       Cover art helpers using LastFM (CORS-enabled)
        -------------------------------------------------------------------- */
-    async _getCoverDataFromITunes(artist, title) {
+    async _getCoverData(artist, title) {
         const searchText = artist === title ? title : `${artist} — ${title}`;
         const cacheKey = searchText.toLowerCase();
 
@@ -593,27 +590,45 @@ class RadioApp {
         };
 
         try {
-            // Try corsproxy.io first (more reliable)
-            const itunesUrl = `https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`;
-            const proxiedUrl = CONFIG.CORS_PROXY_URL + encodeURIComponent(itunesUrl);
-
-            const response = await fetch(proxiedUrl);
-            if (!response.ok || response.status >= 400) {
+            // Use Last.fm API (CORS-enabled) to get album art
+            // This is more reliable than iTunes and doesn't require a proxy
+            const lastfmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&api_key=d41d8cd98f00b204e9800998ecf8427e&format=json`;
+            
+            const response = await fetch(lastfmUrl);
+            if (!response.ok) {
                 this.coverCache.set(cacheKey, fallback);
                 return fallback;
             }
 
             const data = await response.json();
-            if (!data.results || data.results.length === 0) {
+            
+            // Check if we have results
+            if (!data.results || !data.results.trackmatches || data.results.trackmatches.length === 0) {
                 this.coverCache.set(cacheKey, fallback);
                 return fallback;
             }
 
-            const itunes = data.results[0];
-            const thumb = itunes.artworkUrl100 || CONFIG.DEFAULT_COVER;
+            const track = data.results.trackmatches[0];
+            if (!track.image || track.image.length === 0) {
+                this.coverCache.set(cacheKey, fallback);
+                return fallback;
+            }
+
+            // Get the largest image available
+            const images = track.image;
+            let largeImage = null;
+            let mediumImage = null;
+
+            for (const img of images) {
+                if (img.size === 'large') largeImage = img['#text'];
+                if (img.size === 'medium') mediumImage = img['#text'];
+            }
+
+            const imageUrl = largeImage || mediumImage || images[images.length - 1]['#text'];
+
             const result = {
-                art: thumb !== CONFIG.DEFAULT_COVER ? this._resizeImageUrl(thumb, '600x600') : thumb,
-                cover: thumb !== CONFIG.DEFAULT_COVER ? this._resizeImageUrl(thumb, '1500x1500') : thumb
+                art: imageUrl || CONFIG.DEFAULT_COVER,
+                cover: imageUrl || CONFIG.DEFAULT_COVER
             };
 
             this.coverCache.set(cacheKey, result);
@@ -623,14 +638,6 @@ class RadioApp {
             this.coverCache.set(cacheKey, fallback);
             return fallback;
         }
-    }
-
-    _resizeImageUrl(url, size) {
-        if (!url) return url;
-        const parts = url.split('/');
-        const filename = parts.pop();
-        const ext = filename.substring(filename.lastIndexOf('.'));
-        return parts.join('/') + '/' + size + ext;
     }
 
     /* --------------------------------------------------------------------
@@ -649,7 +656,7 @@ class RadioApp {
     _updateMediaSessionMetadata(song, artist) {
         if (!('mediaSession' in navigator)) return;
 
-        this._getCoverDataFromITunes(artist, song).then((data) => {
+        this._getCoverData(artist, song).then((data) => {
             const artwork = [
                 { src: data.art, sizes: '96x96', type: 'image/png' },
                 { src: data.art, sizes: '128x128', type: 'image/png' },
@@ -665,6 +672,8 @@ class RadioApp {
                 album: CONFIG.RADIO_NAME,
                 artwork
             });
+        }).catch(() => {
+            // Silently fail - media session will work without metadata
         });
     }
 
