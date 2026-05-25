@@ -6,7 +6,7 @@
 const CONFIG = Object.freeze({
     RADIO_NAME: 'Happy Radio',
     STREAM_URL: 'https://hello.citrus3.com:2020/stream/happyradio',
-    METADATA_API_URL: 'https://hello.citrus3.com:2020/json/stream/happyradio',
+    METADATA_API_URL: '/api/metadata',
     POLLING_INTERVAL: 10000,   // ms
     FETCH_TIMEOUT: 8000,       // ms
     HISTORY_LIMIT: 4,
