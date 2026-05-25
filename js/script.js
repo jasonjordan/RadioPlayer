@@ -227,7 +227,9 @@ class RadioApp {
             this.hasLoaded = true;
             this._onAudioPlay();
         }).catch((err) => {
-            console.error('Play failed:', err);
+            if (err.name !== 'AbortError') {
+                console.error('Play failed:', err);
+            }
             this._onAudioPause();
         });
     }
@@ -254,14 +256,23 @@ class RadioApp {
 
     _setupAudioRecovery() {
         let recoveryTimer = null;
+        let recoveryCount = 0;
         
         const attemptRecovery = (reason) => {
             if (this.audio.paused && !this.hasLoaded) return;
             if (recoveryTimer) return;
             
-            console.warn(`Audio stream interrupted (${reason}). Attempting recovery...`);
+            if (recoveryCount >= 3) {
+                console.warn(`Audio stream interrupted (${reason}). Max recovery attempts reached. Pausing.`);
+                this._pause();
+                recoveryCount = 0;
+                return;
+            }
+            
+            console.warn(`Audio stream interrupted (${reason}). Attempting recovery ${recoveryCount + 1}/3...`);
             
             recoveryTimer = setTimeout(() => {
+                recoveryCount++;
                 const wasPlaying = !this.audio.paused;
                 
                 // Append cache-busting timestamp to force fresh connection
@@ -278,6 +289,14 @@ class RadioApp {
 
         this.audio.addEventListener('error', () => attemptRecovery('error'));
         this.audio.addEventListener('stalled', () => attemptRecovery('stalled'));
+        
+        this.audio.addEventListener('playing', () => {
+            setTimeout(() => {
+                if (!this.audio.paused && !this.audio.error) {
+                    recoveryCount = 0;
+                }
+            }, 5000);
+        });
     }
 
     _pause() {
