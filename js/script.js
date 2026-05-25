@@ -523,6 +523,7 @@ class RadioApp {
             if (!this.hasLoaded) {
                 this.hasLoaded = true;
                 this._removeOverlay();
+                this._play();
             }
         }
     }
