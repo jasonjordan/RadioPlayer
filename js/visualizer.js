@@ -13,6 +13,17 @@ class ParticleVisualizer {
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
+        this.mouseX = -1000;
+        this.mouseY = -1000;
+        window.addEventListener('mousemove', (e) => {
+            this.mouseX = e.clientX;
+            this.mouseY = e.clientY;
+        });
+        window.addEventListener('mouseleave', () => {
+            this.mouseX = -1000;
+            this.mouseY = -1000;
+        });
+        
         // Initialize particles
         for (let i = 0; i < 150; i++) {
             this.particles.push({
@@ -94,6 +105,17 @@ class ParticleVisualizer {
             
             p.x += p.speedX * (1 + boost * 5);
             p.y += p.speedY * (1 + boost * 5);
+            
+            // Mouse interaction
+            const dx = p.x - this.mouseX;
+            const dy = p.y - this.mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < 150) {
+                const force = (150 - distance) / 150;
+                p.x += (dx / distance) * force * 5;
+                p.y += (dy / distance) * force * 5;
+            }
             
             if (p.x < 0) p.x = this.canvas.width;
             if (p.x > this.canvas.width) p.x = 0;
