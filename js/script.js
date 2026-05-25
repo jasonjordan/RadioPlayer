@@ -439,11 +439,16 @@ class RadioApp {
             if (!data) return;
 
             const parsed = this._parseNowPlaying(data);
-            const song = this._formatMetadataString(parsed.song || 'Unknown').trim();
-            const artist = this._formatMetadataString(parsed.artist || 'Unknown').trim();
+            let song = this._formatMetadataString(parsed.song || 'Unknown').trim();
+            let artist = this._formatMetadataString(parsed.artist || 'Unknown').trim();
+
+            if (song.toLowerCase().includes('happy radio')) {
+                song = 'Happy Radio';
+                artist = '';
+            }
 
             if (song !== this.currentSongName) {
-                document.title = `${song} — ${artist} | ${CONFIG.RADIO_NAME}`;
+                document.title = `${song} ${artist ? '— ' + artist : ''} | ${CONFIG.RADIO_NAME}`;
                 this._refreshCover(parsed.coverart);
                 this._refreshCurrentSong(song, artist);
                 this._refreshLyrics(song, artist);
@@ -556,8 +561,6 @@ class RadioApp {
             let res = await fetch(url);
             let data = await res.json();
 
-
-
             const track = data.results && data.results[0] ? data.results[0] : null;
 
             if (track) {
@@ -588,7 +591,15 @@ class RadioApp {
                 document.getElementById('historyInfoGenre').textContent = '-';
                 document.getElementById('historyInfoDuration').textContent = '-';
             }
+        } catch (err) {
+            console.error('Error fetching iTunes data:', err);
+            document.getElementById('historyInfoAlbum').textContent = 'Network Error';
+            document.getElementById('historyInfoYear').textContent = '-';
+            document.getElementById('historyInfoGenre').textContent = '-';
+            document.getElementById('historyInfoDuration').textContent = '-';
+        }
 
+        try {
             // Fetch Wikipedia Bio
             if (artist && artist !== 'Unknown' && artist !== '') {
                 const bioUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&redirects=1&titles=${encodeURIComponent(artist)}&format=json&origin=*`;
@@ -602,20 +613,12 @@ class RadioApp {
                     document.getElementById('historyInfoBioContainer').style.display = 'block';
                 }
             }
-
-            document.getElementById('historyInfoLoading').style.display = 'none';
-            document.getElementById('historyInfoContent').style.display = 'block';
-
         } catch (err) {
-            console.error('Error fetching modal data:', err);
-            document.getElementById('historyInfoAlbum').textContent = 'Network Error';
-            document.getElementById('historyInfoYear').textContent = '-';
-            document.getElementById('historyInfoGenre').textContent = '-';
-            document.getElementById('historyInfoDuration').textContent = '-';
-            
-            document.getElementById('historyInfoLoading').style.display = 'none';
-            document.getElementById('historyInfoContent').style.display = 'block';
+            console.error('Error fetching Wikipedia data:', err);
         }
+
+        document.getElementById('historyInfoLoading').style.display = 'none';
+        document.getElementById('historyInfoContent').style.display = 'block';
     }
 
     async _openArtistInfoModal(artist) {
@@ -817,7 +820,7 @@ class RadioApp {
         setTimeout(() => {
             songEl.textContent = song;
             artistEl.textContent = artist;
-            lyricsTitleEl.textContent = `${song} — ${artist}`;
+            lyricsTitleEl.textContent = artist ? `${song} — ${artist}` : song;
 
             songEl.classList.remove('slide-up-out');
             songEl.classList.add('slide-down-in');
