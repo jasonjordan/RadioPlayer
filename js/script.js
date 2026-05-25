@@ -26,6 +26,8 @@ class RadioApp {
 
         // State
         this.currentSongName = null;
+        this.currentArtistName = null;
+        this.lyricsCacheSong = null;
         this.pollingTimer = null;
         this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
         this.hasLoaded = false;
@@ -287,6 +289,19 @@ class RadioApp {
     }
 
     /* --------------------------------------------------------------------
+       Helper Methods
+       -------------------------------------------------------------------- */
+    _formatMetadataString(str) {
+        if (!str) return '';
+        let formatted = str.replace(/_/g, ' ');
+        formatted = formatted.split(' ').map(word => {
+            if (!word) return '';
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }).join(' ');
+        return formatted;
+    }
+
+    /* --------------------------------------------------------------------
        Polling & metadata fetching
        -------------------------------------------------------------------- */
     _startPolling() {
@@ -307,8 +322,8 @@ class RadioApp {
             if (!data) return;
 
             const parsed = this._parseNowPlaying(data);
-            const song = (parsed.song || 'Unknown').trim();
-            const artist = (parsed.artist || 'Unknown').trim();
+            const song = this._formatMetadataString(parsed.song || 'Unknown').trim();
+            const artist = this._formatMetadataString(parsed.artist || 'Unknown').trim();
 
             if (song !== this.currentSongName) {
                 document.title = `${song} — ${artist} | ${CONFIG.RADIO_NAME}`;
@@ -317,12 +332,18 @@ class RadioApp {
                 this._refreshLyrics(song, artist);
                 this._refreshHistory(parsed.history);
                 this.currentSongName = song;
+                this.currentArtistName = artist;
 
                 this._updateMediaSessionMetadata(song, artist, parsed.coverart);
             }
 
             if (!this.hasLoaded) {
                 this.hasLoaded = true;
+                const overlay = document.getElementById('startupOverlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 500);
+                }
                 this._play();
             }
         } catch (err) {
@@ -587,6 +608,13 @@ class RadioApp {
                     this._openArtistInfoModal(artist);
                 };
             }
+
+            const lyricsBtn = document.querySelector('.lyrics[data-target="#modalLyrics"]');
+            if (lyricsBtn) {
+                lyricsBtn.onclick = () => {
+                    this._loadLyrics(song, artist);
+                };
+            }
         }, 500);
     }
 
@@ -685,13 +713,27 @@ class RadioApp {
         });
     }
 
-    async _refreshLyrics(song, artist) {
+    _refreshLyrics(song, artist) {
         if (!this.dom.lyricsButton || !this.dom.lyric) return;
 
         if (!song || !artist || song === 'Unknown' || artist === 'Unknown') {
             this._disableLyrics();
             return;
         }
+
+        this.dom.lyricsButton.style.opacity = '1';
+        this.dom.lyricsButton.style.pointerEvents = 'auto';
+
+        this.lyricsCacheSong = null;
+        if (this.dom.lyricsSong) this.dom.lyricsSong.textContent = `${song} — ${artist}`;
+        this.dom.lyric.innerHTML = '<div class="text-center my-4"><i class="fa fa-spinner fa-spin fa-3x mb-3" style="color: #00E1E7;"></i><p>Fetching lyrics...</p></div>';
+    }
+
+    async _loadLyrics(song, artist) {
+        if (!this.dom.lyric) return;
+        if (this.lyricsCacheSong === song) return; // already loaded or loading
+
+        this.lyricsCacheSong = song;
 
         try {
             const response = await this._fetchWithTimeout(
@@ -702,10 +744,11 @@ class RadioApp {
                 this.dom.lyric.innerHTML = this._escapeHtml(response.lyrics).replace(/\n/g, '<br>');
                 this._enableLyrics();
             } else {
-                this._disableLyrics();
+                this.dom.lyric.innerHTML = '<p class="text-warning text-center mt-3">No lyrics found for this track.</p>';
             }
         } catch (err) {
-            this._disableLyrics();
+            console.error('Lyrics fetch failed:', err);
+            this.dom.lyric.innerHTML = '<p class="text-danger text-center mt-3">Failed to load lyrics. Please try again later.</p>';
         }
     }
 
