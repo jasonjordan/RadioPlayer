@@ -29,6 +29,7 @@ class RadioApp {
         this.pollingTimer = null;
         this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
         this.hasLoaded = false;
+        this.historyCache = [];
 
         // Cached DOM refs
         this.dom = {};
@@ -508,7 +509,23 @@ class RadioApp {
     _refreshHistory(historyArray) {
         if (!this.dom.historicSong) return;
 
-        const items = (Array.isArray(historyArray) ? historyArray : []).slice(-CONFIG.HISTORY_LIMIT);
+        const incoming = (Array.isArray(historyArray) ? historyArray : []).slice().reverse();
+        
+        incoming.forEach(newItem => {
+            const recentlyAdded = this.historyCache.slice(-5).find(
+                item => item.song === newItem.song && item.artist === newItem.artist
+            );
+            if (!recentlyAdded) {
+                this.historyCache.push(newItem);
+            }
+        });
+
+        // Limit cache size to prevent memory leaks over very long sessions
+        if (this.historyCache.length > 50) {
+            this.historyCache = this.historyCache.slice(-50);
+        }
+
+        const items = this.historyCache.slice(-CONFIG.HISTORY_LIMIT).reverse();
         this.dom.historicSong.innerHTML = '';
 
         items.forEach((info, index) => {
