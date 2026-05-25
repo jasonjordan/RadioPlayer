@@ -32,14 +32,8 @@ body {
     height: 100%;
     width: 100%;
     position: absolute;
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center 20%;
-    filter: blur(20px);
-    -webkit-filter: blur(20px);
-    transition: all 1.5s linear;
-    transform: scale(2.2);
-  
+    background-color: var(--ambient-color, #1a1a2e);
+    transition: background-color 2s ease, opacity 1.5s ease;
     z-index: 1;
 }
 
@@ -47,7 +41,7 @@ body {
     min-width: 100%;
     min-height: 100%;
     position: absolute;
-     background-color: rgba(0,0,0,0.5);
+    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.9) 100%);
     z-index: 2;
 }
 
@@ -484,14 +478,22 @@ input[type=range]::-ms-thumb {
 
 }
 
-.fade-out {
-    opacity: 0;
-    transition: opacity 0.5s ease-out; /* Ajuste o tempo conforme necessário */
-  }
-  
-  .fade-in {
-    opacity: 1;
-    transition: opacity 0.5s ease-in; /* Ajuste o tempo conforme necessário */
+.slide-up-out {
+    animation: slideUpOut 0.5s forwards ease-in;
+}
+
+.slide-down-in {
+    animation: slideDownIn 0.5s forwards ease-out;
+}
+
+@keyframes slideUpOut {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-30px); opacity: 0; }
+}
+
+@keyframes slideDownIn {
+    0% { transform: translateY(-30px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
 }
 
 .historic-item {

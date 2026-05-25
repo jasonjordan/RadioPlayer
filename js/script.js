@@ -30,9 +30,10 @@ class RadioApp {
         this.lyricsCacheSong = null;
         this.pollingTimer = null;
         this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
-        this.hasLoaded = false;
         this.historyCache = [];
         this.lastJingleTimestamp = 0;
+        this.progressInterval = null;
+        this.visualizer = null;
 
         // Cached DOM refs
         this.dom = {};
@@ -129,6 +130,25 @@ class RadioApp {
 
         // Responsive cover art
         window.addEventListener('resize', () => this._resizeCover());
+
+        // Native Share button
+        this.dom.shareBtn = document.getElementById('shareBtn');
+        if (this.dom.shareBtn) {
+            this.dom.shareBtn.addEventListener('click', () => {
+                const text = `I'm currently vibing to ${this.currentSongName || 'Happy Radio'} by ${this.currentArtistName || ''} on Happy Radio! 🎶`;
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Happy Radio',
+                        text: text,
+                        url: window.location.href
+                    }).catch(console.error);
+                } else {
+                    navigator.clipboard.writeText(`${text} ${window.location.href}`)
+                        .then(() => alert('Link copied to clipboard!'))
+                        .catch(console.error);
+                }
+            });
+        }
     }
 
     /* --------------------------------------------------------------------
@@ -143,15 +163,62 @@ class RadioApp {
     }
 
     _play() {
-        // Load only on first play or after an error
-        if (!this.hasLoaded || this.audio.error) {
-            this.audio.load();
-            this.hasLoaded = true;
+        if (this.audio.src === '') {
+            this.audio.src = CONFIG.STREAM_URL;
         }
 
-        return this.audio.play().catch((err) => {
-            console.error('Audio play failed:', err);
+        // Prevent rapid overlapping fades
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+
+        // Start with 0 volume
+        const targetVolume = this.dom.volumeSlider ? parseInt(this.dom.volumeSlider.value, 10) / 100 : CONFIG.DEFAULT_VOLUME / 100;
+        if (!this.hasLoaded) {
+            this.audio.volume = targetVolume;
+        } else {
+            this.audio.volume = 0;
+        }
+
+        const playPromise = this.audio.play();
+
+        return playPromise.then(() => {
+            if (this.hasLoaded) {
+                // Smooth fade in
+                let currentVol = 0;
+                this.fadeInterval = setInterval(() => {
+                    currentVol += targetVolume / 20; // 50ms * 20 = 1000ms
+                    if (currentVol >= targetVolume) {
+                        currentVol = targetVolume;
+                        clearInterval(this.fadeInterval);
+                    }
+                    this.audio.volume = currentVol;
+                }, 50);
+            }
+            this.hasLoaded = true;
+            this._onAudioPlay();
+        }).catch((err) => {
+            console.error('Play failed:', err);
+            this._onAudioPause();
         });
+    }
+
+    _pause() {
+        if (this.audio.paused && !this.hasLoaded) return;
+        
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        
+        let currentVol = this.audio.volume;
+        const fadeStep = currentVol / 20;
+        
+        this.fadeInterval = setInterval(() => {
+            currentVol -= fadeStep;
+            if (currentVol <= 0) {
+                currentVol = 0;
+                clearInterval(this.fadeInterval);
+                this.audio.pause();
+                this._onAudioPause();
+            }
+            this.audio.volume = currentVol;
+        }, 50);
     }
 
     _setupAudioRecovery() {
@@ -193,6 +260,11 @@ class RadioApp {
             this.dom.playerButton.setAttribute('aria-label', 'Pause');
         }
         this._updateMediaSessionPlaybackState('playing');
+
+        if (!this.visualizer && typeof ParticleVisualizer !== 'undefined') {
+            this.visualizer = new ParticleVisualizer(this.audio);
+        }
+        if (this.visualizer) this.visualizer.start();
     }
 
     _onAudioPause() {
@@ -202,6 +274,8 @@ class RadioApp {
             this.dom.playerButton.setAttribute('aria-label', 'Play');
         }
         this._updateMediaSessionPlaybackState('paused');
+
+        if (this.visualizer) this.visualizer.stop();
     }
 
     _onAudioError(err) {
@@ -374,6 +448,7 @@ class RadioApp {
                 this._refreshCurrentSong(song, artist);
                 this._refreshLyrics(song, artist);
                 this._refreshHistory(parsed.history);
+                this._startProgressBar(song, artist);
                 this.currentSongName = song;
                 this.currentArtistName = artist;
 
@@ -408,6 +483,56 @@ class RadioApp {
         } catch (err) {
             console.error('Lyrics fetch failed:', err);
             this.dom.lyric.innerHTML = '<p class="text-danger">Failed to load lyrics. Please try again later.</p>';
+        }
+    }
+
+    async _startProgressBar(song, artist) {
+        const pContainer = document.getElementById('progressBarContainer');
+        const pFill = document.getElementById('progressBarFill');
+        const pTime = document.getElementById('progressTime');
+        
+        if (!song || !artist || song === 'Happy Radio' || song === 'Unknown' || !pContainer) {
+            if (pContainer) pContainer.style.display = 'none';
+            if (pTime) pTime.style.opacity = '0';
+            if (this.progressInterval) clearInterval(this.progressInterval);
+            return;
+        }
+
+        pContainer.style.display = 'block';
+        pFill.style.width = '0%';
+        pTime.style.opacity = '0';
+        
+        if (this.progressInterval) clearInterval(this.progressInterval);
+
+        try {
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + song)}&limit=1&media=music&entity=song`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const track = data.results && data.results[0] ? data.results[0] : null;
+
+            if (track && track.trackTimeMillis) {
+                const totalMs = track.trackTimeMillis;
+                let elapsed = 0;
+                
+                document.getElementById('progressTotal').textContent = this._formatDuration(totalMs);
+                pTime.style.opacity = '1';
+
+                this.progressInterval = setInterval(() => {
+                    elapsed += 1000;
+                    if (elapsed > totalMs) elapsed = totalMs;
+                    
+                    const percent = (elapsed / totalMs) * 100;
+                    pFill.style.width = `${percent}%`;
+                    document.getElementById('progressCurrent').textContent = this._formatDuration(elapsed);
+                    
+                    if (elapsed >= totalMs) clearInterval(this.progressInterval);
+                }, 1000);
+            } else {
+                pContainer.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Progress bar fetch failed', err);
+            pContainer.style.display = 'none';
         }
     }
 
@@ -684,20 +809,20 @@ class RadioApp {
 
         if (song === songEl.textContent && artist === artistEl.textContent) return;
 
-        songEl.classList.remove('slideInRight', 'animated');
-        songEl.classList.add('animated', 'slideOutLeft');
-        artistEl.classList.remove('slideInRight', 'animated');
-        artistEl.classList.add('animated', 'slideOutLeft');
+        songEl.classList.remove('slide-down-in', 'animated');
+        songEl.classList.add('animated', 'slide-up-out');
+        artistEl.classList.remove('slide-down-in', 'animated');
+        artistEl.classList.add('animated', 'slide-up-out');
 
         setTimeout(() => {
             songEl.textContent = song;
             artistEl.textContent = artist;
             lyricsTitleEl.textContent = `${song} — ${artist}`;
 
-            songEl.classList.remove('slideOutLeft');
-            songEl.classList.add('slideInRight');
-            artistEl.classList.remove('slideOutLeft');
-            artistEl.classList.add('slideInRight');
+            songEl.classList.remove('slide-up-out');
+            songEl.classList.add('slide-down-in');
+            artistEl.classList.remove('slide-up-out');
+            artistEl.classList.add('slide-down-in');
 
             const artistInfoBtn = document.getElementById('artistInfoBtn');
             if (artistInfoBtn) {
@@ -716,6 +841,40 @@ class RadioApp {
         }, 1200);
     }
 
+    _getAverageColor(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 50;
+                canvas.height = 50;
+                ctx.drawImage(img, 0, 0, 50, 50);
+                
+                try {
+                    const data = ctx.getImageData(0, 0, 50, 50).data;
+                    let r = 0, g = 0, b = 0, count = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        // skip fully transparent pixels
+                        if (data[i+3] > 0) {
+                            r += data[i];
+                            g += data[i + 1];
+                            b += data[i + 2];
+                            count++;
+                        }
+                    }
+                    if (count === 0) resolve('#1a1a2e');
+                    else resolve(`rgb(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)})`);
+                } catch (e) {
+                    resolve('#1a1a2e');
+                }
+            };
+            img.onerror = () => resolve('#1a1a2e');
+            img.src = url;
+        });
+    }
+
     _refreshCover(coverartUrl) {
         if (!this.dom.currentCoverArt || !this.dom.bgCover) return;
 
@@ -725,16 +884,17 @@ class RadioApp {
 
         // Fade out
         cover.style.opacity = '0';
-        this.dom.bgCover.style.opacity = '0';
 
-        setTimeout(() => {
+        setTimeout(async () => {
             cover.style.backgroundImage = `url('${coverartUrl}')`;
-            this.dom.bgCover.style.backgroundImage = `url('${coverartUrl}')`;
+            
+            // Get dominant color and apply
+            const dominantColor = await this._getAverageColor(coverartUrl);
+            document.documentElement.style.setProperty('--ambient-color', dominantColor);
             
             // Fade in
             cover.style.opacity = '1';
-            this.dom.bgCover.style.opacity = '1';
-        }, 1500);
+        }, 1200);
     }
 
     _refreshHistory(historyArray) {
