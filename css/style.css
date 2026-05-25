@@ -376,6 +376,10 @@ input[type=range]::-ms-thumb {
         white-space: nowrap;
         max-width: 100%;
     }
+    .lyrics, .support-btn {
+        font-size: 14px;
+        padding: 6px 14px;
+    }
     .percentual-volume {
         margin-top: 15px;
     }
