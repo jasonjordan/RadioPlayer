@@ -13,8 +13,9 @@ const CONFIG = Object.freeze({
     DEFAULT_VOLUME: 80,
     DEFAULT_COVER: 'img/cover.png',
     COVER_CACHE_LIMIT: 100,    // Prevent memory leak
-    // CORS proxy for iTunes API (uses allorigins.win - free CORS proxy)
-    CORS_PROXY_URL: 'https://api.allorigins.win/raw?url='
+    // Alternative: Use a working CORS proxy or backend endpoint
+    // Option 1: Use corsfix proxy
+    CORS_PROXY_URL: 'https://corsproxy.io/?'
 });
 
 /* ========================================================================
@@ -569,7 +570,7 @@ class RadioApp {
     }
 
     /* --------------------------------------------------------------------
-       Cover art helpers with CORS workaround
+       Cover art helpers with improved CORS handling
        -------------------------------------------------------------------- */
     async _getCoverDataFromITunes(artist, title) {
         const searchText = artist === title ? title : `${artist} — ${title}`;
@@ -592,13 +593,12 @@ class RadioApp {
         };
 
         try {
-            // Use CORS proxy to bypass iTunes API CORS restrictions
+            // Try corsproxy.io first (more reliable)
             const itunesUrl = `https://itunes.apple.com/search?limit=1&term=${encodeURIComponent(searchText)}`;
             const proxiedUrl = CONFIG.CORS_PROXY_URL + encodeURIComponent(itunesUrl);
 
             const response = await fetch(proxiedUrl);
-            if (!response.ok || response.status === 403) {
-                // Fallback if proxy fails
+            if (!response.ok || response.status >= 400) {
                 this.coverCache.set(cacheKey, fallback);
                 return fallback;
             }
@@ -619,7 +619,7 @@ class RadioApp {
             this.coverCache.set(cacheKey, result);
             return result;
         } catch (err) {
-            console.warn('Cover art fetch failed:', err);
+            console.warn('Cover art fetch failed for "' + searchText + '":', err.message);
             this.coverCache.set(cacheKey, fallback);
             return fallback;
         }
