@@ -120,6 +120,9 @@ class RadioApp {
             }
         });
 
+        // Auto-reconnect stream on error or stall
+        this._setupAudioRecovery();
+
         // Responsive cover art
         window.addEventListener('resize', () => this._resizeCover());
     }
@@ -142,9 +145,37 @@ class RadioApp {
             this.hasLoaded = true;
         }
 
-        this.audio.play().catch((err) => {
-            console.warn('Audio play failed (user gesture may be required):', err);
+        return this.audio.play().catch((err) => {
+            console.error('Audio play failed:', err);
         });
+    }
+
+    _setupAudioRecovery() {
+        let recoveryTimer = null;
+        
+        const attemptRecovery = (reason) => {
+            if (this.audio.paused && !this.hasLoaded) return;
+            if (recoveryTimer) return;
+            
+            console.warn(`Audio stream interrupted (${reason}). Attempting recovery...`);
+            
+            recoveryTimer = setTimeout(() => {
+                const wasPlaying = !this.audio.paused;
+                
+                // Append cache-busting timestamp to force fresh connection
+                this.audio.src = CONFIG.STREAM_URL + '?t=' + Date.now();
+                this.audio.load();
+                
+                if (wasPlaying) {
+                    this._play();
+                }
+                
+                recoveryTimer = null;
+            }, 3000); // Wait 3 seconds before recovering
+        };
+
+        this.audio.addEventListener('error', () => attemptRecovery('error'));
+        this.audio.addEventListener('stalled', () => attemptRecovery('stalled'));
     }
 
     _pause() {
@@ -299,6 +330,14 @@ class RadioApp {
             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
         }).join(' ');
         return formatted;
+    }
+
+    _isJingleOrStab(song, artist) {
+        const sLower = (song || '').toLowerCase();
+        const aLower = (artist || '').toLowerCase();
+        return sLower.includes('jingle') || aLower.includes('jingle') || 
+               sLower.includes('stab') || aLower.includes('stab') || 
+               sLower.includes('happy radio') || aLower.includes('happy radio');
     }
 
     /* --------------------------------------------------------------------
@@ -511,6 +550,11 @@ class RadioApp {
                 song = data.nowplaying;
             }
         }
+        
+        if (this._isJingleOrStab(song, artist)) {
+            song = 'Happy Radio';
+            artist = '';
+        }
 
         // History parsing
         history = this._parseHistoryArray(data.trackhistory || data.song_history || data.history || data.playlist, data.covers);
@@ -559,6 +603,11 @@ class RadioApp {
                 }
             }
             
+            if (this._isJingleOrStab(parsedSong, parsedArtist)) {
+                parsedSong = 'Happy Radio';
+                parsedArtist = '';
+            }
+
             return { 
                 song: parsedSong, 
                 artist: parsedArtist, 
