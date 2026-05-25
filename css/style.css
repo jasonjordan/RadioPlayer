@@ -112,6 +112,7 @@ main {
     text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 
 }
 
@@ -119,6 +120,7 @@ main {
     text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 
 }
 
@@ -360,6 +362,22 @@ input[type=range]::-ms-thumb {
 @media(max-width: 370px) {
     .cover-album {
         max-width: 100%;
+    }
+}
+
+@media(max-width: 767px) {
+    .info-current-song h2 {
+        font-size: 26px !important;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+    .info-current-song h3 {
+        font-size: 18px !important;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+    .percentual-volume {
+        margin-top: 15px;
     }
 }
 
