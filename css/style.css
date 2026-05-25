@@ -601,6 +601,25 @@ input[type=range]::-ms-thumb {
     }
 }
 
+@media(max-width: 767px) {
+    body, main {
+        height: auto;
+        overflow: visible;
+        display: block;
+    }
+    #player, #player > .container {
+        display: block;
+        height: auto;
+    }
+    .historic {
+        margin-top: 3rem !important;
+        margin-bottom: 2rem !important;
+    }
+    .cover-album {
+        max-height: 50vh;
+    }
+}
+
 :root {
   --animate-duration: 1.2s;
 }
