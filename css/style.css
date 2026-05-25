@@ -186,11 +186,17 @@ body {
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.lyrics:hover, .lyrics:active, .lyrics:focus,
-.support-btn:hover, .support-btn:active, .support-btn:focus {
+.lyrics:hover, .support-btn:hover {
+    text-decoration: none;
+    color: #00E1E7;
+    border-color: #00E1E7;
+}
+
+.lyrics:active, .support-btn:active {
     text-decoration: none;
     color: #000;
     background-color: #fff;
+    border-color: #fff;
     text-shadow: none;
 }
 
@@ -486,4 +492,15 @@ input[type=range]::-ms-thumb {
   .fade-in {
     opacity: 1;
     transition: opacity 0.5s ease-in; /* Ajuste o tempo conforme necessário */
+}
+
+.historic-item {
+    transition: transform 0.2s ease, background 0.2s ease;
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+}
+.historic-item:hover {
+    background: rgba(255,255,255,0.05);
+    transform: scale(1.02);
 }

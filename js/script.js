@@ -320,6 +320,11 @@ class RadioApp {
 
                 this._updateMediaSessionMetadata(song, artist, parsed.coverart);
             }
+
+            if (!this.hasLoaded) {
+                this.hasLoaded = true;
+                this._play();
+            }
         } catch (err) {
             // Silently ignore streaming errors to avoid UI noise
             if (err.name !== 'AbortError') {
@@ -337,8 +342,60 @@ class RadioApp {
             if (!response.ok) return null;
             return await response.json();
         } catch (err) {
-            clearTimeout(id);
-            return null;
+            console.error('Lyrics fetch failed:', err);
+            this.dom.lyric.innerHTML = '<p class="text-danger">Failed to load lyrics. Please try again later.</p>';
+        }
+    }
+
+    async _openHistoryModal(song, artist, defaultCover) {
+        if (!window.$) return; // ensure jQuery is loaded for Bootstrap modals
+        $('#modalHistoryInfo').modal('show');
+        document.getElementById('historyInfoLoading').style.display = 'block';
+        document.getElementById('historyInfoContent').style.display = 'none';
+
+        try {
+            let url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + song)}&limit=1`;
+            let res = await fetch(url);
+            let data = await res.json();
+
+            if (!data.results || data.results.length === 0) {
+                url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&limit=1`;
+                res = await fetch(url);
+                data = await res.json();
+            }
+
+            const track = data.results && data.results[0] ? data.results[0] : null;
+
+            document.getElementById('historyInfoSong').textContent = song;
+            document.getElementById('historyInfoArtist').textContent = artist;
+
+            if (track) {
+                const cover = track.artworkUrl100 ? track.artworkUrl100.replace('100x100', '600x600') : defaultCover;
+                document.getElementById('historyInfoCover').src = cover || CONFIG.DEFAULT_COVER;
+                document.getElementById('historyInfoAlbum').textContent = track.collectionName || 'Unknown';
+                document.getElementById('historyInfoYear').textContent = track.releaseDate ? new Date(track.releaseDate).getFullYear() : 'Unknown';
+                document.getElementById('historyInfoGenre').textContent = track.primaryGenreName || 'Unknown';
+            } else {
+                document.getElementById('historyInfoCover').src = defaultCover || CONFIG.DEFAULT_COVER;
+                document.getElementById('historyInfoAlbum').textContent = 'Not Found on iTunes';
+                document.getElementById('historyInfoYear').textContent = '-';
+                document.getElementById('historyInfoGenre').textContent = '-';
+            }
+
+            document.getElementById('historyInfoLoading').style.display = 'none';
+            document.getElementById('historyInfoContent').style.display = 'block';
+
+        } catch (err) {
+            console.error('Error fetching iTunes data:', err);
+            document.getElementById('historyInfoCover').src = defaultCover || CONFIG.DEFAULT_COVER;
+            document.getElementById('historyInfoSong').textContent = song;
+            document.getElementById('historyInfoArtist').textContent = artist;
+            document.getElementById('historyInfoAlbum').textContent = 'Network Error';
+            document.getElementById('historyInfoYear').textContent = '-';
+            document.getElementById('historyInfoGenre').textContent = '-';
+            
+            document.getElementById('historyInfoLoading').style.display = 'none';
+            document.getElementById('historyInfoContent').style.display = 'block';
         }
     }
 
@@ -548,7 +605,7 @@ class RadioApp {
             const uniqueId = songTitle + '|' + songArtist;
 
             const article = document.createElement('article');
-            article.classList.add('col-12', 'col-md-6');
+            article.classList.add('col-12', 'col-md-6', 'historic-item');
             article.dataset.id = uniqueId;
             article.innerHTML = `
                 <div class="cover-historic" style="background-image: url('${info.coverart || CONFIG.DEFAULT_COVER}');"></div>
@@ -557,6 +614,11 @@ class RadioApp {
                     <p class="artist">${this._escapeHtml(songArtist)}</p>
                 </div>
             `;
+            
+            article.addEventListener('click', () => {
+                this._openHistoryModal(songTitle, songArtist, info.coverart);
+            });
+            
             container.appendChild(article);
         });
 

@@ -120,8 +120,8 @@
                         <p class="mb-0" style="font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">Studio & SMS</p>
                         <a href="tel:0485933944" style="color: #00E1E7; font-weight: bold; font-size: 24px; text-decoration: none;">0485 933 944</a>
                     </div>
-                    <div class="col-12 col-md-4 text-center text-md-right">
-                        <a href="mailto:hello@happyradio.live" class="support-btn mr-3">Contact Us</a>
+                    <div class="col-12 col-md-4 mt-3 mt-md-0 d-flex flex-nowrap justify-content-center justify-content-md-end align-items-center">
+                        <a href="mailto:hello@happyradio.live" class="support-btn mr-2">Contact Us</a>
                         <a href="https://buymeacoffee.com/happyradio" target="_blank" class="support-btn" rel="noopener noreferrer">Support Us</a>
                     </div>
                 </div>
@@ -139,6 +139,42 @@
                     </button>
                 </div>
                 <div class="modal-body" id="lyric"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalHistoryInfo" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="historyInfoTitle">Track Info</h5>
+                    <button type="button" style="color: #fff" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body text-center" id="historyInfoBody">
+                    <div id="historyInfoLoading" style="display: none;">
+                        <i class="fa fa-spinner fa-spin fa-3x fa-fw mb-3" style="color: #00E1E7;"></i>
+                        <p>Loading details...</p>
+                    </div>
+                    <div id="historyInfoContent" style="display: none;">
+                        <img id="historyInfoCover" src="" alt="Cover Art" class="img-fluid rounded mb-3" style="max-width: 250px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                        <h4 id="historyInfoSong" class="font-weight-bold mb-1"></h4>
+                        <h5 id="historyInfoArtist" class="mb-3" style="color: #00E1E7;"></h5>
+                        
+                        <div class="row text-left mt-4" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+                            <div class="col-5 mb-2 text-muted">Album:</div>
+                            <div class="col-7 mb-2" id="historyInfoAlbum"></div>
+                            <div class="col-5 mb-2 text-muted">Released:</div>
+                            <div class="col-7 mb-2" id="historyInfoYear"></div>
+                            <div class="col-5 mb-2 text-muted">Genre:</div>
+                            <div class="col-7 mb-2" id="historyInfoGenre"></div>
+                        </div>
+                    </div>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-dismiss="modal">Close</button>
                 </div>
