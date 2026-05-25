@@ -519,14 +519,17 @@ class RadioApp {
             if (err.name !== 'AbortError') {
                 console.warn('Metadata fetch failed:', err.message);
             }
-            if (!this.currentSongName) {
-                // Fallback UI if the very first load fails
+            if (!this.currentSongName || this.currentSongName === 'Happy Radio') {
+                // Fallback UI if the load fails or is stuck
                 const fallbackSong = 'Happy Radio';
                 const fallbackArtist = 'Live Stream';
                 document.title = `${fallbackSong} — ${fallbackArtist}`;
                 this._refreshCurrentSong(fallbackSong, fallbackArtist);
                 this.currentSongName = fallbackSong;
                 this.currentArtistName = fallbackArtist;
+
+                const historicSection = document.querySelector('.historic');
+                if (historicSection) historicSection.style.display = 'none';
             }
         } finally {
             if (!this.hasLoaded) {
@@ -972,6 +975,14 @@ class RadioApp {
 
     _refreshHistory(historyArray) {
         if (!this.dom.historicSong) return;
+
+        const historicSection = document.querySelector('.historic');
+        if (historicSection) historicSection.style.display = ''; // Restore if hidden
+
+        if (!historyArray || !Array.isArray(historyArray) || historyArray.length === 0) {
+            this.dom.historicSong.innerHTML = '<p class="text-white opacity-50 mb-0">No history available</p>';
+            return;
+        }
 
         const incoming = (Array.isArray(historyArray) ? historyArray : []).slice().reverse();
         
