@@ -486,7 +486,7 @@ class RadioApp {
     async _fetchStreamingData() {
         try {
             const data = await this._fetchWithTimeout(CONFIG.METADATA_API_URL, CONFIG.FETCH_TIMEOUT);
-            if (!data) return;
+            if (!data) throw new Error('Empty response from metadata API');
 
             const parsed = this._parseNowPlaying(data);
             let song = this._formatMetadataString(parsed.song || 'Unknown').trim();
@@ -518,6 +518,15 @@ class RadioApp {
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.warn('Metadata fetch failed:', err.message);
+            }
+            if (!this.currentSongName) {
+                // Fallback UI if the very first load fails
+                const fallbackSong = 'Happy Radio';
+                const fallbackArtist = 'Live Stream';
+                document.title = `${fallbackSong} — ${fallbackArtist}`;
+                this._refreshCurrentSong(fallbackSong, fallbackArtist);
+                this.currentSongName = fallbackSong;
+                this.currentArtistName = fallbackArtist;
             }
         } finally {
             if (!this.hasLoaded) {
