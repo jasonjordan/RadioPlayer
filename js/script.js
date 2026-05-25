@@ -439,11 +439,7 @@ class RadioApp {
             let res = await fetch(url);
             let data = await res.json();
 
-            if (!data.results || data.results.length === 0) {
-                url = `https://itunes.apple.com/search?term=${encodeURIComponent(song)}&limit=1&media=music&entity=song`;
-                res = await fetch(url);
-                data = await res.json();
-            }
+
 
             const track = data.results && data.results[0] ? data.results[0] : null;
 
