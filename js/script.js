@@ -342,7 +342,7 @@ class RadioApp {
                 const overlay = document.getElementById('startupOverlay');
                 if (overlay) {
                     overlay.style.opacity = '0';
-                    setTimeout(() => overlay.remove(), 500);
+                    setTimeout(() => overlay.remove(), 1500);
                 }
                 this._play();
             }
@@ -615,7 +615,7 @@ class RadioApp {
                     this._loadLyrics(song, artist);
                 };
             }
-        }, 500);
+        }, 1200);
     }
 
     _refreshCover(coverartUrl) {
@@ -625,15 +625,18 @@ class RadioApp {
         const currentBg = cover.style.backgroundImage;
         if (currentBg && currentBg.includes(coverartUrl)) return;
 
-        cover.classList.remove('slideInRight', 'bounceInLeft', 'animated');
-        cover.classList.add('animated', 'slideOutLeft');
+        // Fade out
+        cover.style.opacity = '0';
+        this.dom.bgCover.style.opacity = '0';
 
         setTimeout(() => {
             cover.style.backgroundImage = `url('${coverartUrl}')`;
             this.dom.bgCover.style.backgroundImage = `url('${coverartUrl}')`;
-            cover.classList.remove('slideOutLeft');
-            cover.classList.add('slideInRight');
-        }, 500);
+            
+            // Fade in
+            cover.style.opacity = '1';
+            this.dom.bgCover.style.opacity = '1';
+        }, 1500);
     }
 
     _refreshHistory(historyArray) {
