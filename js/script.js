@@ -474,36 +474,39 @@ class RadioApp {
 
         if (song === songEl.textContent && artist === artistEl.textContent) return;
 
-        songEl.classList.add('fade-out');
-        artistEl.classList.add('fade-out');
+        songEl.classList.remove('slideInRight', 'animated');
+        songEl.classList.add('animated', 'slideOutLeft');
+        artistEl.classList.remove('slideInRight', 'animated');
+        artistEl.classList.add('animated', 'slideOutLeft');
 
         setTimeout(() => {
             songEl.textContent = song;
             artistEl.textContent = artist;
             lyricsTitleEl.textContent = `${song} — ${artist}`;
 
-            songEl.classList.remove('fade-out');
-            songEl.classList.add('fade-in');
-            artistEl.classList.remove('fade-out');
-            artistEl.classList.add('fade-in');
+            songEl.classList.remove('slideOutLeft');
+            songEl.classList.add('slideInRight');
+            artistEl.classList.remove('slideOutLeft');
+            artistEl.classList.add('slideInRight');
         }, 500);
-
-        setTimeout(() => {
-            songEl.classList.remove('fade-in');
-            artistEl.classList.remove('fade-in');
-        }, 1000);
     }
 
     _refreshCover(coverartUrl) {
         if (!this.dom.currentCoverArt || !this.dom.bgCover) return;
 
-        this.dom.currentCoverArt.style.backgroundImage = `url('${coverartUrl}')`;
-        this.dom.bgCover.style.backgroundImage = `url('${coverartUrl}')`;
+        const cover = this.dom.currentCoverArt;
+        const currentBg = cover.style.backgroundImage;
+        if (currentBg && currentBg.includes(coverartUrl)) return;
 
-        this.dom.currentCoverArt.classList.add('animated', 'bounceInLeft');
+        cover.classList.remove('slideInRight', 'bounceInLeft', 'animated');
+        cover.classList.add('animated', 'slideOutLeft');
+
         setTimeout(() => {
-            this.dom.currentCoverArt.classList.remove('animated', 'bounceInLeft');
-        }, 2000);
+            cover.style.backgroundImage = `url('${coverartUrl}')`;
+            this.dom.bgCover.style.backgroundImage = `url('${coverartUrl}')`;
+            cover.classList.remove('slideOutLeft');
+            cover.classList.add('slideInRight');
+        }, 500);
     }
 
     _refreshHistory(historyArray) {
@@ -526,14 +529,22 @@ class RadioApp {
         }
 
         const items = this.historyCache.slice(-CONFIG.HISTORY_LIMIT).reverse();
-        this.dom.historicSong.innerHTML = '';
+        const container = this.dom.historicSong;
+        
+        const oldChildren = Array.from(container.children);
+        const oldRects = oldChildren.map(el => el.getBoundingClientRect());
+        const oldIds = oldChildren.map(el => el.dataset.id);
+
+        container.innerHTML = '';
 
         items.forEach((info, index) => {
             const songTitle = info.song || 'Unknown';
             const songArtist = info.artist || 'Unknown';
+            const uniqueId = songTitle + '|' + songArtist;
 
             const article = document.createElement('article');
             article.classList.add('col-12', 'col-md-6');
+            article.dataset.id = uniqueId;
             article.innerHTML = `
                 <div class="cover-historic" style="background-image: url('${info.coverart || CONFIG.DEFAULT_COVER}');"></div>
                 <div class="music-info">
@@ -541,13 +552,32 @@ class RadioApp {
                     <p class="artist">${this._escapeHtml(songArtist)}</p>
                 </div>
             `;
-            this.dom.historicSong.appendChild(article);
+            container.appendChild(article);
+        });
 
-            // Staggered animation
-            requestAnimationFrame(() => {
-                article.classList.add('animated', 'slideInRight');
-                setTimeout(() => article.classList.remove('animated', 'slideInRight'), 2000);
-            });
+        // FLIP animation
+        const newChildren = Array.from(container.children);
+        newChildren.forEach(newEl => {
+            const id = newEl.dataset.id;
+            const oldIndex = oldIds.indexOf(id);
+            if (oldIndex !== -1) {
+                const oldRect = oldRects[oldIndex];
+                const newRect = newEl.getBoundingClientRect();
+                const dx = oldRect.left - newRect.left;
+                const dy = oldRect.top - newRect.top;
+                if (dx !== 0 || dy !== 0) {
+                    newEl.style.transform = `translate(${dx}px, ${dy}px)`;
+                    newEl.style.transition = 'none';
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            newEl.style.transform = '';
+                            newEl.style.transition = 'transform 0.5s ease-in-out';
+                        });
+                    });
+                }
+            } else {
+                newEl.classList.add('animated', 'slideInLeft');
+            }
         });
     }
 
