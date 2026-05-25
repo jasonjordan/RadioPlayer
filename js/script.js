@@ -464,8 +464,10 @@ class RadioApp {
                 this.hasLoaded = true;
                 const overlay = document.getElementById('startupOverlay');
                 if (overlay) {
-                    overlay.style.opacity = '0';
-                    setTimeout(() => overlay.remove(), 1500);
+                    setTimeout(() => {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 1500);
+                    }, 1000);
                 }
                 this._play();
             }
