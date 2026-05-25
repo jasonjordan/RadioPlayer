@@ -11,8 +11,7 @@ const CONFIG = Object.freeze({
     FETCH_TIMEOUT: 8000,       // ms
     HISTORY_LIMIT: 4,
     DEFAULT_VOLUME: 80,
-    DEFAULT_COVER: 'img/cover.png',
-    COVER_CACHE_LIMIT: 100     // Prevent memory leak
+    DEFAULT_COVER: 'img/cover.png'
 });
 
 /* ========================================================================
@@ -27,7 +26,6 @@ class RadioApp {
 
         // State
         this.currentSongName = null;
-        this.coverCache = new Map();
         this.pollingTimer = null;
         this.volumeBeforeMute = CONFIG.DEFAULT_VOLUME;
         this.hasLoaded = false;
@@ -313,13 +311,13 @@ class RadioApp {
 
             if (song !== this.currentSongName) {
                 document.title = `${song} — ${artist} | ${CONFIG.RADIO_NAME}`;
-                this._refreshCover(song, artist);
+                this._refreshCover(parsed.coverart);
                 this._refreshCurrentSong(song, artist);
                 this._refreshLyrics(song, artist);
                 this._refreshHistory(parsed.history);
                 this.currentSongName = song;
 
-                this._updateMediaSessionMetadata(song, artist);
+                this._updateMediaSessionMetadata(song, artist, parsed.coverart);
             }
         } catch (err) {
             // Silently ignore streaming errors to avoid UI noise
@@ -391,41 +389,57 @@ class RadioApp {
         }
 
         // History parsing
-        history = this._parseHistoryArray(data.song_history || data.history || data.playlist);
+        history = this._parseHistoryArray(data.trackhistory || data.song_history || data.history || data.playlist, data.covers);
 
         return {
             song: song || 'Unknown',
             artist: artist || 'Unknown',
+            coverart: data.coverart || CONFIG.DEFAULT_COVER,
             history
         };
     }
 
-    _parseHistoryArray(source) {
+    _parseHistoryArray(source, covers = []) {
         if (!Array.isArray(source)) return [];
 
-        return source.map((item) => {
+        return source.map((item, index) => {
+            let parsedSong = 'Unknown';
+            let parsedArtist = 'Unknown';
+
             if (typeof item === 'string') {
                 const parts = item.split(' - ').map((s) => s.trim());
-                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                return { song: item, artist: 'Unknown' };
-            }
-            if (!item) return { song: 'Unknown', artist: 'Unknown' };
-
-            if (item.song) {
-                if (typeof item.song === 'object') {
-                    return {
-                        song: item.song.title || 'Unknown',
-                        artist: item.song.artist || 'Unknown'
-                    };
+                if (parts.length === 2) {
+                    parsedArtist = parts[0];
+                    parsedSong = parts[1];
+                } else {
+                    parsedSong = item;
                 }
-                const parts = String(item.song).split(' - ').map((s) => s.trim());
-                if (parts.length === 2) return { song: parts[1], artist: parts[0] };
-                return { song: String(item.song), artist: item.artist || 'Unknown' };
+            } else if (item) {
+                if (item.song) {
+                    if (typeof item.song === 'object') {
+                        parsedSong = item.song.title || 'Unknown';
+                        parsedArtist = item.song.artist || 'Unknown';
+                    } else {
+                        const parts = String(item.song).split(' - ').map((s) => s.trim());
+                        if (parts.length === 2) {
+                            parsedArtist = parts[0];
+                            parsedSong = parts[1];
+                        } else {
+                            parsedSong = String(item.song);
+                            parsedArtist = item.artist || 'Unknown';
+                        }
+                    }
+                } else if (item.title) {
+                    parsedSong = item.title;
+                    parsedArtist = item.artist || 'Unknown';
+                }
             }
-            if (item.title) {
-                return { song: item.title, artist: item.artist || 'Unknown' };
-            }
-            return { song: 'Unknown', artist: 'Unknown' };
+            
+            return { 
+                song: parsedSong, 
+                artist: parsedArtist, 
+                coverart: covers[index] || CONFIG.DEFAULT_COVER 
+            };
         });
     }
 
@@ -460,22 +474,16 @@ class RadioApp {
         }, 1000);
     }
 
-    async _refreshCover(song, artist) {
+    _refreshCover(coverartUrl) {
         if (!this.dom.currentCoverArt || !this.dom.bgCover) return;
 
-        try {
-            const data = await this._getCoverData(artist, song);
-            this.dom.currentCoverArt.style.backgroundImage = `url('${data.art}')`;
-            this.dom.bgCover.style.backgroundImage = `url('${data.cover}')`;
+        this.dom.currentCoverArt.style.backgroundImage = `url('${coverartUrl}')`;
+        this.dom.bgCover.style.backgroundImage = `url('${coverartUrl}')`;
 
-            this.dom.currentCoverArt.classList.add('animated', 'bounceInLeft');
-            setTimeout(() => {
-                this.dom.currentCoverArt.classList.remove('animated', 'bounceInLeft');
-            }, 2000);
-        } catch (err) {
-            this.dom.currentCoverArt.style.backgroundImage = `url('${CONFIG.DEFAULT_COVER}')`;
-            this.dom.bgCover.style.backgroundImage = `url('${CONFIG.DEFAULT_COVER}')`;
-        }
+        this.dom.currentCoverArt.classList.add('animated', 'bounceInLeft');
+        setTimeout(() => {
+            this.dom.currentCoverArt.classList.remove('animated', 'bounceInLeft');
+        }, 2000);
     }
 
     _refreshHistory(historyArray) {
@@ -491,7 +499,7 @@ class RadioApp {
             const article = document.createElement('article');
             article.classList.add('col-12', 'col-md-6');
             article.innerHTML = `
-                <div class="cover-historic" style="background-image: url('${CONFIG.DEFAULT_COVER}');"></div>
+                <div class="cover-historic" style="background-image: url('${info.coverart || CONFIG.DEFAULT_COVER}');"></div>
                 <div class="music-info">
                     <p class="song">${this._escapeHtml(songTitle)}</p>
                     <p class="artist">${this._escapeHtml(songArtist)}</p>
@@ -504,16 +512,6 @@ class RadioApp {
                 article.classList.add('animated', 'slideInRight');
                 setTimeout(() => article.classList.remove('animated', 'slideInRight'), 2000);
             });
-
-            // Fetch cover asynchronously
-            this._getCoverData(songArtist, songTitle)
-                .then((data) => {
-                    const coverEl = article.querySelector('.cover-historic');
-                    if (coverEl) coverEl.style.backgroundImage = `url('${data.art}')`;
-                })
-                .catch(() => {
-                    // keep default cover
-                });
         });
     }
 
@@ -567,80 +565,6 @@ class RadioApp {
     }
 
     /* --------------------------------------------------------------------
-       Cover art helpers using LastFM (CORS-enabled)
-       -------------------------------------------------------------------- */
-    async _getCoverData(artist, title) {
-        const searchText = artist === title ? title : `${artist} — ${title}`;
-        const cacheKey = searchText.toLowerCase();
-
-        // Check cache first
-        if (this.coverCache.has(cacheKey)) {
-            return this.coverCache.get(cacheKey);
-        }
-
-        // Prevent memory leak by limiting cache size
-        if (this.coverCache.size >= CONFIG.COVER_CACHE_LIMIT) {
-            const firstKey = this.coverCache.keys().next().value;
-            this.coverCache.delete(firstKey);
-        }
-
-        const fallback = {
-            art: CONFIG.DEFAULT_COVER,
-            cover: CONFIG.DEFAULT_COVER
-        };
-
-        try {
-            // Use Last.fm API (CORS-enabled) to get album art
-            // This is more reliable than iTunes and doesn't require a proxy
-            const lastfmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&api_key=d41d8cd98f00b204e9800998ecf8427e&format=json`;
-            
-            const response = await fetch(lastfmUrl);
-            if (!response.ok) {
-                this.coverCache.set(cacheKey, fallback);
-                return fallback;
-            }
-
-            const data = await response.json();
-            
-            // Check if we have results
-            if (!data.results || !data.results.trackmatches || data.results.trackmatches.length === 0) {
-                this.coverCache.set(cacheKey, fallback);
-                return fallback;
-            }
-
-            const track = data.results.trackmatches[0];
-            if (!track.image || track.image.length === 0) {
-                this.coverCache.set(cacheKey, fallback);
-                return fallback;
-            }
-
-            // Get the largest image available
-            const images = track.image;
-            let largeImage = null;
-            let mediumImage = null;
-
-            for (const img of images) {
-                if (img.size === 'large') largeImage = img['#text'];
-                if (img.size === 'medium') mediumImage = img['#text'];
-            }
-
-            const imageUrl = largeImage || mediumImage || images[images.length - 1]['#text'];
-
-            const result = {
-                art: imageUrl || CONFIG.DEFAULT_COVER,
-                cover: imageUrl || CONFIG.DEFAULT_COVER
-            };
-
-            this.coverCache.set(cacheKey, result);
-            return result;
-        } catch (err) {
-            console.warn('Cover art fetch failed for "' + searchText + '":', err.message);
-            this.coverCache.set(cacheKey, fallback);
-            return fallback;
-        }
-    }
-
-    /* --------------------------------------------------------------------
        Media Session API
        -------------------------------------------------------------------- */
     _setupMediaSession() {
@@ -653,27 +577,24 @@ class RadioApp {
         navigator.mediaSession.setActionHandler('seekforward', null);
     }
 
-    _updateMediaSessionMetadata(song, artist) {
+    _updateMediaSessionMetadata(song, artist, coverartUrl) {
         if (!('mediaSession' in navigator)) return;
 
-        this._getCoverData(artist, song).then((data) => {
-            const artwork = [
-                { src: data.art, sizes: '96x96', type: 'image/png' },
-                { src: data.art, sizes: '128x128', type: 'image/png' },
-                { src: data.art, sizes: '192x192', type: 'image/png' },
-                { src: data.art, sizes: '256x256', type: 'image/png' },
-                { src: data.art, sizes: '384x384', type: 'image/png' },
-                { src: data.art, sizes: '512x512', type: 'image/png' }
-            ];
+        const art = coverartUrl || CONFIG.DEFAULT_COVER;
+        const artwork = [
+            { src: art, sizes: '96x96', type: 'image/png' },
+            { src: art, sizes: '128x128', type: 'image/png' },
+            { src: art, sizes: '192x192', type: 'image/png' },
+            { src: art, sizes: '256x256', type: 'image/png' },
+            { src: art, sizes: '384x384', type: 'image/png' },
+            { src: art, sizes: '512x512', type: 'image/png' }
+        ];
 
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: song,
-                artist: artist,
-                album: CONFIG.RADIO_NAME,
-                artwork
-            });
-        }).catch(() => {
-            // Silently fail - media session will work without metadata
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: song,
+            artist: artist,
+            album: CONFIG.RADIO_NAME,
+            artwork
         });
     }
 
