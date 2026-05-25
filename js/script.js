@@ -546,8 +546,8 @@ class RadioApp {
             if (!response.ok) return null;
             return await response.json();
         } catch (err) {
-            console.error('Lyrics fetch failed:', err);
-            this.dom.lyric.innerHTML = '<p class="text-danger">Failed to load lyrics. Please try again later.</p>';
+            clearTimeout(id);
+            throw err;
         }
     }
 
