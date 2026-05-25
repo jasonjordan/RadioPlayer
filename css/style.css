@@ -112,16 +112,12 @@ main {
     text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-
 }
 
 .current-artist {
     text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-
 }
 
 .play-pause {
@@ -548,7 +544,7 @@ input[type=range]::-ms-thumb {
     justify-content: center;
     align-items: center;
     color: #00E1E7;
-    transition: opacity 1.5s ease;
+    transition: opacity 3s ease;
 }
 
 :root {

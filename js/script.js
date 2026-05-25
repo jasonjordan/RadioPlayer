@@ -466,7 +466,7 @@ class RadioApp {
                 if (overlay) {
                     setTimeout(() => {
                         overlay.style.opacity = '0';
-                        setTimeout(() => overlay.remove(), 1500);
+                        setTimeout(() => overlay.remove(), 3000);
                     }, 1000);
                 }
                 this._play();
