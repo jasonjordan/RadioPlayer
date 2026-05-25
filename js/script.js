@@ -388,6 +388,17 @@ class RadioApp {
             if (!artist && data.current_track.artist) artist = data.current_track.artist;
         }
 
+        // 5) nowplaying string (e.g. Citrus3 JSON: "Artist - Title")
+        if ((!song || !artist) && typeof data.nowplaying === 'string') {
+            const parts = data.nowplaying.split(' - ').map((s) => s.trim());
+            if (parts.length === 2) {
+                artist = parts[0];
+                song = parts[1];
+            } else {
+                song = data.nowplaying;
+            }
+        }
+
         // History parsing
         history = this._parseHistoryArray(data.trackhistory || data.song_history || data.history || data.playlist, data.covers);
 
