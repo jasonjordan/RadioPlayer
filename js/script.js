@@ -901,10 +901,19 @@ class RadioApp {
                 parsedArtist = '';
             }
 
+            let parsedCover = covers[index] || CONFIG.DEFAULT_COVER;
+            if (item && item.albumArtUrl) {
+                let absoluteUrl = item.albumArtUrl;
+                if (!absoluteUrl.startsWith('http')) {
+                    absoluteUrl = `https://hq3.yesstreaming.net${item.albumArtUrl}`;
+                }
+                parsedCover = `/api/album-art?url=${encodeURIComponent(absoluteUrl)}`;
+            }
+
             return {
                 song: parsedSong,
                 artist: parsedArtist,
-                coverart: covers[index] || CONFIG.DEFAULT_COVER
+                coverart: parsedCover
             };
         });
 
