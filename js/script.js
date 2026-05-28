@@ -1038,8 +1038,6 @@ class RadioApp {
             return;
         }
 
-        const incoming = (Array.isArray(historyArray) ? historyArray : []).slice().reverse();
-
         incoming.forEach(newItem => {
             const recentlyAdded = this.historyCache.slice(-5).find(
                 item => item.song === newItem.song && item.artist === newItem.artist
