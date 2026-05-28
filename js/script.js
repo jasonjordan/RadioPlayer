@@ -827,10 +827,20 @@ class RadioApp {
         // History parsing
         history = this._parseHistoryArray(data.trackhistory || data.song_history || data.history || data.playlist, data.covers);
 
+        // YesStreaming provides a relative albumArtUrl
+        let coverart = data.coverart || CONFIG.DEFAULT_COVER;
+        if (data.albumArtUrl) {
+            if (data.albumArtUrl.startsWith('http')) {
+                coverart = data.albumArtUrl;
+            } else {
+                coverart = `https://hq3.yesstreaming.net${data.albumArtUrl}`;
+            }
+        }
+
         return {
             song: song || 'Unknown',
             artist: artist || 'Unknown',
-            coverart: data.coverart || CONFIG.DEFAULT_COVER,
+            coverart: coverart,
             history
         };
     }
