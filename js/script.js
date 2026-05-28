@@ -55,7 +55,7 @@ class RadioApp {
 
     _setupDebugLogger() {
         if (!window.location.search.includes('debug=1')) return;
-        
+
         const debugUI = document.createElement('div');
         debugUI.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:30vh; background:rgba(0,0,0,0.8); color:#0f0; font-family:monospace; font-size:10px; z-index:999999; overflow-y:scroll; padding:10px; pointer-events:auto;';
         document.body.appendChild(debugUI);
@@ -73,13 +73,13 @@ class RadioApp {
             debugUI.scrollTop = debugUI.scrollHeight;
         };
 
-        console.log = function() { ogLog.apply(console, arguments); printMsg('LOG', arguments); };
-        console.warn = function() { ogWarn.apply(console, arguments); printMsg('WARN', arguments); };
-        console.error = function() { ogError.apply(console, arguments); printMsg('ERROR', arguments); };
-        
+        console.log = function () { ogLog.apply(console, arguments); printMsg('LOG', arguments); };
+        console.warn = function () { ogWarn.apply(console, arguments); printMsg('WARN', arguments); };
+        console.error = function () { ogError.apply(console, arguments); printMsg('ERROR', arguments); };
+
         window.addEventListener('error', (e) => console.error('Uncaught', e.message));
         window.addEventListener('unhandledrejection', (e) => console.error('Promise Rejection', e.reason ? e.reason.message : e.reason));
-        
+
         console.log('--- DEBUG MODE ENABLED ---');
     }
 
@@ -236,12 +236,12 @@ class RadioApp {
 
     _pause() {
         if (this.audio.paused && !this.hasLoaded) return;
-        
+
         if (this.fadeInterval) clearInterval(this.fadeInterval);
-        
+
         let currentVol = this.audio.volume;
         const fadeStep = currentVol / 20;
-        
+
         this.fadeInterval = setInterval(() => {
             currentVol -= fadeStep;
             if (currentVol <= 0) {
@@ -257,39 +257,39 @@ class RadioApp {
     _setupAudioRecovery() {
         let recoveryTimer = null;
         let recoveryCount = 0;
-        
+
         const attemptRecovery = (reason) => {
             if (this.audio.paused && !this.hasLoaded) return;
             if (recoveryTimer) return;
-            
+
             if (recoveryCount >= 3) {
                 console.warn(`Audio stream interrupted (${reason}). Max recovery attempts reached. Pausing.`);
                 this._pause();
                 recoveryCount = 0;
                 return;
             }
-            
+
             console.warn(`Audio stream interrupted (${reason}). Attempting recovery ${recoveryCount + 1}/3...`);
-            
+
             recoveryTimer = setTimeout(() => {
                 recoveryCount++;
                 const wasPlaying = !this.audio.paused;
-                
+
                 // Append cache-busting timestamp to force fresh connection
                 this.audio.src = CONFIG.STREAM_URL + '?t=' + Date.now();
                 this.audio.load();
-                
+
                 if (wasPlaying) {
                     this._play();
                 }
-                
+
                 recoveryTimer = null;
             }, 3000); // Wait 3 seconds before recovering
         };
 
         this.audio.addEventListener('error', () => attemptRecovery('error'));
         this.audio.addEventListener('stalled', () => attemptRecovery('stalled'));
-        
+
         this.audio.addEventListener('playing', () => {
             setTimeout(() => {
                 if (!this.audio.paused && !this.audio.error) {
@@ -463,9 +463,9 @@ class RadioApp {
     _isJingleOrStab(song, artist) {
         const sLower = (song || '').toLowerCase();
         const aLower = (artist || '').toLowerCase();
-        return sLower.includes('jingle') || aLower.includes('jingle') || 
-               sLower.includes('stab') || aLower.includes('stab') || 
-               sLower.includes('happy radio') || aLower.includes('happy radio');
+        return sLower.includes('jingle') || aLower.includes('jingle') ||
+            sLower.includes('stab') || aLower.includes('stab') ||
+            sLower.includes('happy radio') || aLower.includes('happy radio');
     }
 
     /* --------------------------------------------------------------------
@@ -539,7 +539,7 @@ class RadioApp {
 
                 const historicSection = document.querySelector('.historic');
                 if (historicSection) historicSection.classList.add('d-none');
-                
+
                 const callLyrics = document.querySelector('.call-lyrics');
                 if (callLyrics) {
                     callLyrics.classList.remove('d-flex');
@@ -583,7 +583,7 @@ class RadioApp {
         const pContainer = document.getElementById('progressBarContainer');
         const pFill = document.getElementById('progressBarFill');
         const pTime = document.getElementById('progressTime');
-        
+
         if (!song || !artist || song === 'Happy Radio' || song === 'Unknown' || !pContainer) {
             if (pContainer) pContainer.style.display = 'none';
             if (pTime) pTime.style.opacity = '0';
@@ -594,7 +594,7 @@ class RadioApp {
         pContainer.style.display = 'block';
         pFill.style.width = '0%';
         pTime.style.opacity = '0';
-        
+
         if (this.progressInterval) clearInterval(this.progressInterval);
 
         try {
@@ -606,18 +606,18 @@ class RadioApp {
             if (track && track.trackTimeMillis) {
                 const totalMs = track.trackTimeMillis;
                 let elapsed = 0;
-                
+
                 document.getElementById('progressTotal').textContent = this._formatDuration(totalMs);
                 pTime.style.opacity = '1';
 
                 this.progressInterval = setInterval(() => {
                     elapsed += 1000;
                     if (elapsed > totalMs) elapsed = totalMs;
-                    
+
                     const percent = (elapsed / totalMs) * 100;
                     pFill.style.width = `${percent}%`;
                     document.getElementById('progressCurrent').textContent = this._formatDuration(elapsed);
-                    
+
                     if (elapsed >= totalMs) clearInterval(this.progressInterval);
                 }, 1000);
             } else {
@@ -657,16 +657,16 @@ class RadioApp {
                 document.getElementById('historyInfoAlbum').textContent = track.collectionName || 'Unknown';
                 document.getElementById('historyInfoYear').textContent = track.releaseDate ? new Date(track.releaseDate).getFullYear() : 'Unknown';
                 document.getElementById('historyInfoGenre').textContent = track.primaryGenreName || 'Unknown';
-                
+
                 // Track Duration
                 document.getElementById('historyInfoDuration').textContent = this._formatDuration(track.trackTimeMillis);
-                
+
                 // Audio Preview
                 if (track.previewUrl) {
                     document.getElementById('historyInfoPreviewContainer').style.display = 'block';
                     document.getElementById('historyInfoPreviewAudio').src = track.previewUrl;
                 }
-                
+
                 // Apple Music Link
                 if (track.trackViewUrl) {
                     const appleLink = document.getElementById('historyInfoAppleLink');
@@ -695,7 +695,7 @@ class RadioApp {
                 const bioData = await bioRes.json();
                 const pages = bioData.query.pages;
                 const pageId = Object.keys(pages)[0];
-                
+
                 if (pageId !== '-1' && pages[pageId].extract) {
                     document.getElementById('historyInfoBio').textContent = pages[pageId].extract;
                     document.getElementById('historyInfoBioContainer').style.display = 'block';
@@ -714,24 +714,24 @@ class RadioApp {
         $('#modalArtistInfo').modal('show');
         document.getElementById('artistInfoLoading').style.display = 'block';
         document.getElementById('artistInfoContent').style.display = 'none';
-        
+
         try {
             const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&titles=${encodeURIComponent(artist)}&format=json&origin=*`;
             const res = await fetch(url);
             const data = await res.json();
-            
+
             const pages = data.query.pages;
             const pageId = Object.keys(pages)[0];
             const extract = pages[pageId].extract;
-            
+
             document.getElementById('artistInfoName').textContent = artist;
-            
+
             if (pageId === '-1' || !extract) {
                 document.getElementById('artistInfoBio').innerHTML = `<p>No biography found on Wikipedia for <strong>${this._escapeHtml(artist)}</strong>.</p>`;
             } else {
                 document.getElementById('artistInfoBio').innerHTML = extract;
             }
-            
+
             document.getElementById('artistInfoLoading').style.display = 'none';
             document.getElementById('artistInfoContent').style.display = 'block';
         } catch (err) {
@@ -808,13 +808,13 @@ class RadioApp {
                 song = data.nowplaying;
             }
         }
-        
+
         let isJingle = this._isJingleOrStab(song, artist);
-        
+
         if (isJingle) {
             this.lastJingleTimestamp = Date.now();
         }
-        
+
         if (isJingle || (Date.now() - this.lastJingleTimestamp < 5000)) {
             song = 'Happy Radio';
             artist = '';
@@ -867,16 +867,16 @@ class RadioApp {
                     parsedArtist = item.artist || 'Unknown';
                 }
             }
-            
+
             if (this._isJingleOrStab(parsedSong, parsedArtist)) {
                 parsedSong = 'Happy Radio';
                 parsedArtist = '';
             }
 
-            return { 
-                song: parsedSong, 
-                artist: parsedArtist, 
-                coverart: covers[index] || CONFIG.DEFAULT_COVER 
+            return {
+                song: parsedSong,
+                artist: parsedArtist,
+                coverart: covers[index] || CONFIG.DEFAULT_COVER
             };
         });
 
@@ -942,13 +942,13 @@ class RadioApp {
                 canvas.width = 50;
                 canvas.height = 50;
                 ctx.drawImage(img, 0, 0, 50, 50);
-                
+
                 try {
                     const data = ctx.getImageData(0, 0, 50, 50).data;
                     let r = 0, g = 0, b = 0, count = 0;
                     for (let i = 0; i < data.length; i += 4) {
                         // skip fully transparent pixels
-                        if (data[i+3] > 0) {
+                        if (data[i + 3] > 0) {
                             r += data[i];
                             g += data[i + 1];
                             b += data[i + 2];
@@ -978,11 +978,11 @@ class RadioApp {
 
         setTimeout(async () => {
             cover.style.backgroundImage = `url('${coverartUrl}')`;
-            
+
             // Get dominant color and apply
             const dominantColor = await this._getAverageColor(coverartUrl);
             document.documentElement.style.setProperty('--ambient-color', dominantColor);
-            
+
             // Fade in
             cover.style.opacity = '1';
         }, 1200);
@@ -1000,7 +1000,7 @@ class RadioApp {
         }
 
         const incoming = (Array.isArray(historyArray) ? historyArray : []).slice().reverse();
-        
+
         incoming.forEach(newItem => {
             const recentlyAdded = this.historyCache.slice(-5).find(
                 item => item.song === newItem.song && item.artist === newItem.artist
@@ -1017,7 +1017,7 @@ class RadioApp {
 
         const items = this.historyCache.slice(-CONFIG.HISTORY_LIMIT).reverse();
         const container = this.dom.historicSong;
-        
+
         const oldChildren = Array.from(container.children);
         const oldRects = oldChildren.map(el => el.getBoundingClientRect());
         const oldIds = oldChildren.map(el => el.dataset.id);
@@ -1039,11 +1039,11 @@ class RadioApp {
                     <p class="artist">${this._escapeHtml(songArtist)}</p>
                 </div>
             `;
-            
+
             article.addEventListener('click', () => {
                 this._openHistoryModal(songTitle, songArtist, info.coverart);
             });
-            
+
             container.appendChild(article);
         });
 
