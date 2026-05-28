@@ -830,11 +830,12 @@ class RadioApp {
         // YesStreaming provides a relative albumArtUrl
         let coverart = data.coverart || CONFIG.DEFAULT_COVER;
         if (data.albumArtUrl) {
-            if (data.albumArtUrl.startsWith('http')) {
-                coverart = data.albumArtUrl;
-            } else {
-                coverart = `https://hq3.yesstreaming.net${data.albumArtUrl}`;
+            let absoluteUrl = data.albumArtUrl;
+            if (!absoluteUrl.startsWith('http')) {
+                absoluteUrl = `https://hq3.yesstreaming.net${data.albumArtUrl}`;
             }
+            // Route through our CORS proxy to allow canvas color extraction
+            coverart = `/api/album-art?url=${encodeURIComponent(absoluteUrl)}`;
         }
 
         return {
