@@ -6,7 +6,7 @@
 const CONFIG = Object.freeze({
     RADIO_NAME: 'Happy Radio',
     STREAM_URL: 'https://hq3.yesstreaming.net/45185683',
-    METADATA_API_URL: '/api/client/22/station/11/now-playing',
+    METADATA_API_URL: '/api/metadata',
     POLLING_INTERVAL: 10000,   // ms
     FETCH_TIMEOUT: 8000,       // ms
     HISTORY_LIMIT: 4,
@@ -763,8 +763,11 @@ class RadioApp {
             return { song: 'Unknown', artist: 'Unknown', history: [] };
         }
 
-        // 1) Direct fields: songtitle + artist
-        if (data.songtitle) {
+        // 1) Direct fields: title, songtitle + artist
+        if (data.title) {
+            song = data.title;
+            if (typeof data.artist === 'string') artist = data.artist;
+        } else if (data.songtitle) {
             song = data.songtitle;
             if (typeof data.artist === 'string') artist = data.artist;
             else if (data.artist && typeof data.artist === 'object' && data.artist.title) artist = data.artist.title;

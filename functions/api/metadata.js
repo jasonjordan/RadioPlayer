@@ -1,5 +1,5 @@
 export async function onRequest(context) {
-    const targetUrl = 'https://hello.citrus3.com:2020/json/stream/happyradio';
+    const targetUrl = 'https://hq3.yesstreaming.net/api/client/22/station/11/now-playing';
 
     try {
         const response = await fetch(targetUrl);
