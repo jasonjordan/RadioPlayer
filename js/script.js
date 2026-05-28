@@ -5,8 +5,8 @@
    ======================================================================== */
 const CONFIG = Object.freeze({
     RADIO_NAME: 'Happy Radio',
-    STREAM_URL: 'https://hello.citrus3.com:2020/stream/happyradio',
-    METADATA_API_URL: '/api/metadata',
+    STREAM_URL: 'https://hq3.yesstreaming.net/45185683',
+    METADATA_API_URL: '/api/client/22/station/11/now-playing',
     POLLING_INTERVAL: 10000,   // ms
     FETCH_TIMEOUT: 8000,       // ms
     HISTORY_LIMIT: 4,
