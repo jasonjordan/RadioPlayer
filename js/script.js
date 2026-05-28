@@ -498,6 +498,20 @@ class RadioApp {
             }
 
             if (song !== this.currentSongName) {
+                // Manually maintain history since yesstreaming API does not provide it
+                if (this.currentSongName && this.currentSongName !== 'Happy Radio' && this.currentSongName !== 'Unknown') {
+                    const oldSongObj = {
+                        song: this.currentSongName,
+                        artist: this.currentArtistName || 'Unknown',
+                        coverart: this.currentCoverartUrl || CONFIG.DEFAULT_COVER
+                    };
+                    const lastAdded = this.historyCache[this.historyCache.length - 1];
+                    if (!lastAdded || lastAdded.song !== oldSongObj.song) {
+                        this.historyCache.push(oldSongObj);
+                    }
+                }
+                this.currentCoverartUrl = parsed.coverart;
+
                 // Restore UI elements if recovering from fallback
                 const historicSection = document.querySelector('.historic');
                 if (historicSection) historicSection.classList.remove('d-none');
@@ -1008,7 +1022,9 @@ class RadioApp {
         const historicSection = document.querySelector('.historic');
         if (historicSection) historicSection.classList.remove('d-none'); // Restore if hidden
 
-        if (!historyArray || !Array.isArray(historyArray) || historyArray.length === 0) {
+        const incoming = (Array.isArray(historyArray) ? historyArray : []).slice().reverse();
+
+        if (this.historyCache.length === 0 && incoming.length === 0) {
             this.dom.historicSong.innerHTML = '<p class="text-white opacity-50 mb-0">No history available</p>';
             return;
         }
