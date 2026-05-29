@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <canvas id="plasma" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0.25; pointer-events: none;"></canvas>
     <div id="startupOverlay">
         <img src="img/cover.png" alt="Happy Radio" class="mb-4" style="width: 250px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
         <h2 style="font-weight: 800; text-transform: uppercase;">Connecting!</h2>
@@ -255,6 +256,7 @@
     
     <script src="js/visualizer.js"></script>
     <script src="js/logo-interaction.js"></script>
+    <script src="js/plasma.js"></script>
     <script src="js/script.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
