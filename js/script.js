@@ -121,13 +121,7 @@ class RadioApp {
         // Easter egg
         if (this.dom.currentCoverArt) {
             this.dom.currentCoverArt.addEventListener('click', () => {
-                if (this.currentIsDJLive) {
-                    (function(){
-                        var s=document.createElement('script');
-                        s.setAttribute('src','https://kathack.com');
-                        document.body.appendChild(s);
-                    })();
-                }
+                this._triggerEasterEgg();
             });
             this.dom.currentCoverArt.style.cursor = 'pointer';
         }
@@ -196,6 +190,19 @@ class RadioApp {
         }
     }
 
+    _triggerEasterEgg() {
+        if (this.currentIsDJLive) {
+            (function(){
+                var s=document.createElement('script');
+                s.setAttribute('src','https://kathack.com');
+                document.body.appendChild(s);
+            })();
+        }
+    }
+
+    /* --------------------------------------------------------------------
+       Data fetching
+       -------------------------------------------------------------------- */
     /* --------------------------------------------------------------------
        Playback controls
        -------------------------------------------------------------------- */
@@ -437,6 +444,9 @@ class RadioApp {
             case 'm':
             case 'M':
                 this.toggleMute();
+                break;
+            case '!':
+                this._triggerEasterEgg();
                 break;
             case '0':
             case '1':
