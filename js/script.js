@@ -118,6 +118,20 @@ class RadioApp {
             });
         }
 
+        // Easter egg
+        if (this.dom.currentCoverArt) {
+            this.dom.currentCoverArt.addEventListener('click', () => {
+                if (this.currentIsDJLive) {
+                    (function(){
+                        var s=document.createElement('script');
+                        s.setAttribute('src','https://kathack.com');
+                        document.body.appendChild(s);
+                    })();
+                }
+            });
+            this.dom.currentCoverArt.style.cursor = 'pointer';
+        }
+
         // Audio lifecycle
         this.audio.addEventListener('play', () => this._onAudioPlay());
         this.audio.addEventListener('pause', () => this._onAudioPause());
@@ -529,6 +543,7 @@ class RadioApp {
                 this._startProgressBar(song, artist);
                 this.currentSongName = song;
                 this.currentArtistName = artist;
+                this.currentIsDJLive = parsed.isDJLive;
 
                 this._updateMediaSessionMetadata(song, artist, parsed.coverart);
             }
