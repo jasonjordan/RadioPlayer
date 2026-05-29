@@ -643,3 +643,18 @@ input[type=range]::-ms-thumb {
 :root {
   --animate-duration: 1.2s;
 }
+
+@keyframes occasional-wobble {
+    0%, 15%, 100% { transform: rotate(0deg) scale(1); }
+    2% { transform: rotate(-4deg) scale(1.02); }
+    4% { transform: rotate(6deg) scale(1.02); }
+    6% { transform: rotate(-6deg) scale(1.02); }
+    8% { transform: rotate(4deg) scale(1.02); }
+    10% { transform: rotate(-2deg) scale(1.02); }
+    12% { transform: rotate(2deg) scale(1.02); }
+}
+
+.wobble-logo {
+    animation: occasional-wobble 8s ease-in-out infinite;
+    transform-origin: center center;
+}
