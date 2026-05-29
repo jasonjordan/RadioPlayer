@@ -1162,7 +1162,7 @@ class RadioApp {
             article.classList.add('col-12', 'col-md-6', 'historic-item');
             article.dataset.id = uniqueId;
             const playedTimeHtml = info.playedAt 
-                ? `<p class="time mt-1" style="font-size: 10px; margin-bottom: 0; background: rgba(0, 225, 231, 0.15); color: #00E1E7; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: 600; letter-spacing: 0.5px;"><i class="fa fa-clock-o mr-1"></i>${new Date(info.playedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</p>` 
+                ? `<p class="time mt-1" style="font-size: 12px; margin-bottom: 0; background: rgba(0, 225, 231, 0.15); color: #00E1E7; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: 600; letter-spacing: 0.5px;"><i class="fa fa-clock-o mr-1"></i>${new Date(info.playedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</p>` 
                 : '';
 
             article.innerHTML = `
