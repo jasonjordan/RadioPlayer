@@ -94,6 +94,10 @@ main {
     transition: background-image 1s;
     border-radius: 10px;
     margin-bottom: 2vh;
+    /* 3D Perspective: rotateY pushes the right side away */
+    transform: perspective(1000px) rotateY(15deg);
+    transform-style: preserve-3d;
+    box-shadow: -15px 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 
