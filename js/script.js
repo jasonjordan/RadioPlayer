@@ -523,7 +523,7 @@ class RadioApp {
 
                 document.title = `${song} ${artist ? '— ' + artist : ''} | ${CONFIG.RADIO_NAME}`;
                 this._refreshCover(parsed.coverart);
-                this._refreshCurrentSong(song, artist);
+                this._refreshCurrentSong(song, artist, parsed.isDJLive, parsed.djName);
                 this._refreshLyrics(song, artist);
                 this._refreshHistory(parsed.history);
                 this._startProgressBar(song, artist);
@@ -547,7 +547,7 @@ class RadioApp {
                 const fallbackSong = 'Happy Radio';
                 const fallbackArtist = 'Live Stream';
                 document.title = `${fallbackSong} — ${fallbackArtist}`;
-                this._refreshCurrentSong(fallbackSong, fallbackArtist);
+                this._refreshCurrentSong(fallbackSong, fallbackArtist, false, null);
                 this.currentSongName = fallbackSong;
                 this.currentArtistName = fallbackArtist;
 
@@ -841,9 +841,18 @@ class RadioApp {
         // History parsing
         history = this._parseHistoryArray(data.trackhistory || data.song_history || data.history || data.playlist, data.covers);
 
-        // YesStreaming provides a relative albumArtUrl
+        // Handle Live DJ
         let coverart = data.coverart || CONFIG.DEFAULT_COVER;
-        if (data.albumArtUrl) {
+        let isDJLive = data.isDJLive === true;
+        let djName = data.djName || 'Live DJ';
+
+        if (isDJLive && data.djImageUrl) {
+            let absoluteUrl = data.djImageUrl;
+            if (!absoluteUrl.startsWith('http')) absoluteUrl = `https://hq3.yesstreaming.net${data.djImageUrl}`;
+            coverart = `/api/album-art?url=${encodeURIComponent(absoluteUrl)}`;
+        }
+        // YesStreaming provides a relative albumArtUrl for automated songs
+        else if (data.albumArtUrl) {
             let absoluteUrl = data.albumArtUrl;
             if (!absoluteUrl.startsWith('http')) {
                 absoluteUrl = `https://hq3.yesstreaming.net${data.albumArtUrl}`;
@@ -856,7 +865,9 @@ class RadioApp {
             song: song || 'Unknown',
             artist: artist || 'Unknown',
             coverart: coverart,
-            history
+            history: history,
+            isDJLive: isDJLive,
+            djName: djName
         };
     }
 
@@ -929,18 +940,36 @@ class RadioApp {
     /* --------------------------------------------------------------------
        UI updates
        -------------------------------------------------------------------- */
-    _refreshCurrentSong(song, artist) {
+    _refreshCurrentSong(song, artist, isDJLive = false, djName = '') {
         const songEl = this.dom.currentSong;
         const artistEl = this.dom.currentArtist;
         const lyricsTitleEl = this.dom.lyricsSong;
+        const badgeEl = document.getElementById('liveDjBadge');
+        const djNameTextEl = document.getElementById('djNameText');
+
         if (!songEl || !artistEl || !lyricsTitleEl) return;
 
-        if (song === songEl.textContent && artist === artistEl.textContent) return;
+        // If song is unchanged, just quickly update badge if needed
+        if (song === songEl.textContent && artist === artistEl.textContent) {
+            if (badgeEl && djNameTextEl) {
+                if (isDJLive && djName) {
+                    badgeEl.classList.remove('d-none');
+                    djNameTextEl.textContent = djName;
+                } else {
+                    badgeEl.classList.add('d-none');
+                }
+            }
+            return;
+        }
 
         songEl.classList.remove('slide-down-in', 'animated');
         songEl.classList.add('animated', 'slide-up-out');
         artistEl.classList.remove('slide-down-in', 'animated');
         artistEl.classList.add('animated', 'slide-up-out');
+        if (badgeEl) {
+            badgeEl.classList.remove('slide-down-in', 'animated');
+            badgeEl.classList.add('animated', 'slide-up-out');
+        }
 
         setTimeout(() => {
             songEl.textContent = song;
@@ -951,6 +980,16 @@ class RadioApp {
             songEl.classList.add('slide-down-in');
             artistEl.classList.remove('slide-up-out');
             artistEl.classList.add('slide-down-in');
+            
+            if (badgeEl) {
+                if (isDJLive && djName) {
+                    badgeEl.classList.remove('d-none', 'slide-up-out');
+                    badgeEl.classList.add('slide-down-in');
+                    djNameTextEl.textContent = djName;
+                } else {
+                    badgeEl.classList.add('d-none');
+                }
+            }
 
             const artistInfoBtn = document.getElementById('artistInfoBtn');
             if (artistInfoBtn) {
