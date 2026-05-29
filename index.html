@@ -19,14 +19,14 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <canvas id="plasma" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0.25; pointer-events: none;"></canvas>
     <div id="startupOverlay">
         <img src="img/cover.png" alt="Happy Radio" class="mb-4" style="width: 250px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
         <h2 style="font-weight: 800; text-transform: uppercase;">Connecting!</h2>
         <i class="fa fa-spinner fa-spin fa-2x mt-2"></i>
     </div>
     <div class="cover-site">
-        <div id="bgCover"></div>
+        <canvas id="plasma" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none;"></canvas>
+        <div id="bgCover" style="opacity: 0.75;"></div>
         <div class="bg-mask"></div>
     </div>
     <main>
