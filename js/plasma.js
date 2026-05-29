@@ -39,17 +39,29 @@ class Plasma {
     }
   
     createPalette() {
-        for (let i = 0; i < 64; i++) {
-            let r = i << 2; 
-            let g = 255 - ((i << 2) + 1);
-            this.palette[i] = {r: r, g: g, b: 0}; 
-            g = (i << 2) + 1;
-            this.palette[i + 64] = {r: 255, g: g, b: 0};
-            r = 255 - ((i << 2) + 1);
-            g = r;
-            this.palette[i + 128] = {r: r, g: g, b: 0};
-            g = (i << 2) + 1;
-            this.palette[i + 192] = {r: 0, g: g, b: 0};
+        for (let i = 0; i < 256; i++) {
+            // Full color spectrum (rainbow) for maximum saturation
+            let h = (i / 256) * 360;
+            let s = 1; // 100% saturation
+            let l = 0.5; // 50% lightness for maximum vibrance
+            
+            let c = (1 - Math.abs(2 * l - 1)) * s;
+            let x = c * (1 - Math.abs((h / 60) % 2 - 1));
+            let m = l - c/2;
+            
+            let r = 0, g = 0, b = 0;
+            if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+            else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+            else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+            else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+            else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+            else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+            
+            this.palette[i] = {
+                r: Math.round((r + m) * 255),
+                g: Math.round((g + m) * 255),
+                b: Math.round((b + m) * 255)
+            };
         }
     }
   
@@ -58,8 +70,8 @@ class Plasma {
         this.tpos3 = this.pos3; 
         
         for (let i = 0; i < this.screenHeight; i++) {
-            this.tpos1 = this.pos1 + 5; 
-            this.tpos2 = 3; 
+            this.tpos1 = this.pos1 + 2; 
+            this.tpos2 = 1.5; 
             this.tpos3 &= 511;
             this.tpos4 &= 511;
             for (let j = 0; j < this.screenWidth; j++) {
@@ -73,18 +85,18 @@ class Plasma {
                 }
                 this.pixelBuffer[i * this.screenWidth + j] = this.palette[index];
                 
-                // Keep the structural shape the same
-                this.tpos1 += 5;
-                this.tpos2 += 3;
+                // Zoom in by reducing inner loop increments
+                this.tpos1 += 2;
+                this.tpos2 += 1.5;
             }
             
-            this.tpos4 += 3;
-            this.tpos3 += 1;
+            this.tpos4 += 1.5;
+            this.tpos3 += 0.5;
         }
         
-        // Slow down the animation for a smoother background effect
-        this.pos1 += 1.5;
-        this.pos3 += 1.2; 
+        // Slow down the animation even more
+        this.pos1 += 0.5;
+        this.pos3 += 0.4; 
     }
 
     renderFrame() {
