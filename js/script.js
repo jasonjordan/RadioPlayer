@@ -1133,7 +1133,18 @@ class RadioApp {
             this.historyCache = this.historyCache.slice(-50);
         }
 
-        const items = this.historyCache.slice(-CONFIG.HISTORY_LIMIT).reverse();
+        let items = this.historyCache.slice().reverse();
+        
+        // Remove all duplicates (keep the most recent playback only)
+        const seen = new Set();
+        items = items.filter(item => {
+            const key = (item.song + '|' + item.artist).toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        items = items.slice(0, CONFIG.HISTORY_LIMIT);
         const container = this.dom.historicSong;
 
         const oldChildren = Array.from(container.children);
