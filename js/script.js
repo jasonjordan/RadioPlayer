@@ -209,7 +209,13 @@ class RadioApp {
     /* --------------------------------------------------------------------
        Playback controls
        -------------------------------------------------------------------- */
-    togglePlay() {
+    _togglePlay() {
+        // Hide the animated cue if it exists
+        const playCue = document.getElementById('playCue');
+        if (playCue) {
+            playCue.style.display = 'none';
+        }
+
         if (this.audio.paused) {
             this._play();
         } else {

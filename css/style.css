@@ -148,13 +148,31 @@ main {
 }
 
 .play-pause {
-    font-size: 65px; 
+    font-size: 95px; 
     color: white; 
+    position: relative; /* So absolute cue can position correctly */
 }
 
 .play-pause i {
     cursor: pointer;
     color: white; 
+    transition: transform 0.2s ease;
+}
+
+.play-pause i:hover {
+    transform: scale(1.1);
+}
+
+@keyframes bounce-cue {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    40% {
+        transform: translateX(-50%) translateY(-15px);
+    }
+    60% {
+        transform: translateX(-50%) translateY(-7px);
+    }
 }
 
 .volume-icon {
