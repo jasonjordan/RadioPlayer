@@ -109,11 +109,11 @@ class RadioApp {
     _bindEvents() {
         // Play / pause button
         if (this.dom.playerButton) {
-            this.dom.playerButton.addEventListener('click', () => this.togglePlay());
+            this.dom.playerButton.addEventListener('click', () => this._togglePlay());
             this.dom.playerButton.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    this.togglePlay();
+                    this._togglePlay();
                 }
             });
         }
@@ -577,7 +577,6 @@ class RadioApp {
             if (!this.hasLoaded) {
                 this.hasLoaded = true;
                 this._removeOverlay();
-                this._play();
             }
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -605,7 +604,6 @@ class RadioApp {
             if (!this.hasLoaded) {
                 this.hasLoaded = true;
                 this._removeOverlay();
-                this._play();
             }
         }
     }
@@ -1290,8 +1288,8 @@ class RadioApp {
     _setupMediaSession() {
         if (!('mediaSession' in navigator)) return;
 
-        navigator.mediaSession.setActionHandler('play', () => this._play());
-        navigator.mediaSession.setActionHandler('pause', () => this._pause());
+        navigator.mediaSession.setActionHandler('play', () => this._togglePlay());
+        navigator.mediaSession.setActionHandler('pause', () => this._togglePlay());
         navigator.mediaSession.setActionHandler('stop', () => this._pause());
         navigator.mediaSession.setActionHandler('seekbackward', null);
         navigator.mediaSession.setActionHandler('seekforward', null);
