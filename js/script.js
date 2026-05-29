@@ -215,6 +215,13 @@ class RadioApp {
         if (playCue) {
             playCue.style.display = 'none';
         }
+        
+        // Hide dim overlay
+        const dimOverlay = document.getElementById('dimOverlay');
+        if (dimOverlay) {
+            dimOverlay.style.opacity = '0';
+            setTimeout(() => dimOverlay.style.display = 'none', 800);
+        }
 
         if (this.audio.paused) {
             this._play();
