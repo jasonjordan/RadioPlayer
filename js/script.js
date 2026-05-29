@@ -156,6 +156,9 @@ class RadioApp {
         // Auto-reconnect stream on error or stall
         this._setupAudioRecovery();
 
+        // Start live clock
+        this._startLiveClock();
+
         // Stop preview audio when History modal closes
         if (window.$) {
             $('#modalHistoryInfo').on('hidden.bs.modal', () => {
@@ -949,7 +952,8 @@ class RadioApp {
             return {
                 song: parsedSong,
                 artist: parsedArtist,
-                coverart: parsedCover
+                coverart: parsedCover,
+                playedAt: item ? item.playedAt : null
             };
         });
 
@@ -962,8 +966,21 @@ class RadioApp {
         });
     }
 
+    _startLiveClock() {
+        const clockEl = document.getElementById('liveClock');
+        if (!clockEl) return;
+
+        const updateClock = () => {
+            const now = new Date();
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            clockEl.textContent = now.toLocaleDateString(undefined, options);
+        };
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
     /* --------------------------------------------------------------------
-       UI updates
+       Visual updates
        -------------------------------------------------------------------- */
     _refreshCurrentSong(song, artist, isDJLive = false, djName = '') {
         const songEl = this.dom.currentSong;
@@ -1133,11 +1150,16 @@ class RadioApp {
             const article = document.createElement('article');
             article.classList.add('col-12', 'col-md-6', 'historic-item');
             article.dataset.id = uniqueId;
+            const playedTimeHtml = info.playedAt 
+                ? `<p class="time text-muted mt-1" style="font-size: 11px; opacity: 0.8; margin-bottom: 0;">Played at ${new Date(info.playedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</p>` 
+                : '';
+
             article.innerHTML = `
                 <div class="cover-historic" style="background-image: url('${info.coverart || CONFIG.DEFAULT_COVER}');"></div>
                 <div class="music-info">
                     <p class="song">${this._escapeHtml(songTitle)}</p>
                     <p class="artist">${this._escapeHtml(songArtist)}</p>
+                    ${playedTimeHtml}
                 </div>
             `;
 
