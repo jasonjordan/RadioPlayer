@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'radio-player-v20';
+const CACHE_NAME = 'radio-player-v21';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
