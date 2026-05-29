@@ -190,8 +190,8 @@ class RadioApp {
         }
     }
 
-    _triggerEasterEgg() {
-        if (this.currentIsDJLive) {
+    _triggerEasterEgg(force = false) {
+        if (this.currentIsDJLive || force) {
             (function(){
                 var s=document.createElement('script');
                 s.setAttribute('src','https://kathack.com');
@@ -446,7 +446,7 @@ class RadioApp {
                 this.toggleMute();
                 break;
             case '!':
-                this._triggerEasterEgg();
+                this._triggerEasterEgg(true);
                 break;
             case '0':
             case '1':
