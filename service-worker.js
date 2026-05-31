@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'radio-player-v23';
+const CACHE_NAME = 'radio-player-v24';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
     '/css/animate.css',
     '/css/font-awesome.min.css',
     '/js/plasma.js',
+    '/js/vortex-transition.js',
     '/js/script.js',
     '/js/bootstrap.min.js',
     '/img/cover.png',

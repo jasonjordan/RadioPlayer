@@ -216,11 +216,17 @@ class RadioApp {
             playCue.style.display = 'none';
         }
         
-        // Hide dim overlay
+        // Vortex drain the dim overlay (first play only)
         const dimOverlay = document.getElementById('dimOverlay');
-        if (dimOverlay) {
-            dimOverlay.style.opacity = '0';
-            setTimeout(() => dimOverlay.style.display = 'none', 800);
+        if (dimOverlay && dimOverlay.style.display !== 'none') {
+            if (typeof VortexTransition !== 'undefined' && typeof gsap !== 'undefined') {
+                const vortex = new VortexTransition({ overlay: dimOverlay });
+                vortex.trigger();
+            } else {
+                // Fallback if GSAP hasn't loaded
+                dimOverlay.style.opacity = '0';
+                setTimeout(() => dimOverlay.style.display = 'none', 800);
+            }
         }
 
         if (this.audio.paused) {
