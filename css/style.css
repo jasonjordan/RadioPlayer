@@ -659,3 +659,102 @@ input[type=range]::-ms-thumb {
     animation: occasional-wobble 8s ease-in-out infinite;
     transform-origin: center center;
 }
+
+/* Support Us button — bright orange with periodic pulse */
+.support-us-btn {
+    background: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    color: #fff !important;
+    animation: support-pulse 4s ease-in-out infinite;
+}
+
+.support-us-btn:hover {
+    background: #FF8C33 !important;
+    border-color: #FF8C33 !important;
+    color: #fff !important;
+}
+
+.support-us-btn:visited {
+    color: #fff !important;
+}
+
+@keyframes support-pulse {
+    0%, 20%, 100% {
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+        transform: scale(1);
+    }
+    5% {
+        box-shadow: 0 0 18px rgba(255, 107, 0, 0.7), 0 0 40px rgba(255, 107, 0, 0.3);
+        transform: scale(1.08);
+    }
+    10% {
+        box-shadow: 0 0 12px rgba(255, 107, 0, 0.5);
+        transform: scale(1);
+    }
+}
+
+/* Desktop viewport-fit: scale entire page to fit without scrollbars */
+@media (min-width: 768px) {
+    main {
+        height: 100dvh;
+        max-height: 100dvh;
+        overflow: hidden;
+    }
+
+    #player > .container {
+        max-height: calc(100dvh - 10px);
+        overflow: hidden;
+    }
+
+    .web-player {
+        margin-top: clamp(5px, 1vh, 25px);
+    }
+
+    .cover-album {
+        max-height: clamp(120px, 28vh, 320px);
+    }
+
+    .info-current-song h2 {
+        font-size: clamp(18px, 3.5vw, 46px);
+        line-height: 1.1;
+    }
+
+    .info-current-song h3 {
+        font-size: clamp(14px, 2vw, 22px);
+    }
+
+    .historic h2 {
+        font-size: clamp(14px, 2vh, 22px);
+        margin-bottom: clamp(2px, 0.5vh, 10px);
+    }
+
+    .cover-historic {
+        width: clamp(35px, 7vh, 95px);
+        height: clamp(35px, 7vh, 95px);
+    }
+
+    .music-info .song {
+        font-size: clamp(12px, 1.5vh, 20px);
+    }
+
+    .music-info .artist {
+        font-size: clamp(10px, 1.3vh, 16px);
+    }
+
+    .historic-item {
+        padding: clamp(3px, 0.6vh, 10px);
+    }
+
+    .play-pause {
+        font-size: clamp(50px, 8vh, 95px);
+    }
+
+    .lyrics, .support-btn {
+        font-size: clamp(11px, 1.4vh, 18px);
+        padding: clamp(4px, 0.6vh, 8px) clamp(10px, 1.5vw, 24px);
+    }
+
+    #footerLogo {
+        width: clamp(80px, 16vh, 220px) !important;
+    }
+}
